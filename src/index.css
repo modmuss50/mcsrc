@@ -1,0 +1,6 @@
+body {
+  background-color: #121212;
+}
+
+/* Prevent scrolling the body */
+html, body {margin: 0; height: 100%; overflow: hidden}

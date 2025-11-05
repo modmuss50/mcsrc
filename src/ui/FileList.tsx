@@ -5,14 +5,31 @@ import { map, type Observable } from 'rxjs';
 import { classesList } from '../logic/JarFile';
 import { useObservable } from '../utils/UseObservable';
 import Header from './Header';
-import { selectedFile } from '../logic/Decompiler';
+import { selectedFile } from '../logic/State';
+import { useState } from 'react';
+import type { Key } from 'antd/es/table/interface';
+
+// Sorts nodes with children first (directories before files), then alphabetically
+const sortTreeNodes = (nodes: TreeDataNode[] = []) => {
+    nodes.sort((a, b) => {
+        const aHas = !!(a.children && a.children.length);
+        const bHas = !!(b.children && b.children.length);
+        if (aHas !== bHas) return aHas ? -1 : 1;
+        const aTitle = String(a.title).toLowerCase();
+        const bTitle = String(b.title).toLowerCase();
+        return aTitle.localeCompare(bTitle);
+    });
+    nodes.forEach(n => {
+        if (n.children && n.children.length) sortTreeNodes(n.children);
+    });
+};
 
 // Given a list of class files, create a tree structure
 const data: Observable<TreeDataNode[]> = classesList.pipe(
     map(classFiles => {
         const root: TreeDataNode[] = [];
 
-        [...classFiles].sort().forEach(filePath => {
+        classFiles.forEach(filePath => {
             const parts = filePath.split('/');
             let currentLevel = root;
 
@@ -34,27 +51,52 @@ const data: Observable<TreeDataNode[]> = classesList.pipe(
                 }
             });
         });
+        sortTreeNodes(root);
         return root;
     })
 );
 
+const selectedFileKeys = selectedFile.pipe(
+    map(file => [file])
+);
+
+function getPathKeys(filePath: string): Key[] {
+    const parts = filePath.split('/').slice(0, -1);
+    const result: string[] = [];
+    for (let i = 0; i < parts.length; i++) {
+        result.push(parts.slice(0, i + 1).join('/'));
+    }
+    return result;
+}
+
 const FileList = () => {
-    const onSelect: TreeProps['onSelect'] = (selectedKeys, info) => {
-        console.log(selectedKeys.join('/'));
+    const [expandedKeys, setExpandedKeys] = useState<Key[]>();
+    const onExpand = (newExpandedKeys: Key[]) => {
+        setExpandedKeys(newExpandedKeys);
+    };
+
+    const selectedKeys = useObservable(selectedFileKeys);
+    const onSelect: TreeProps['onSelect'] = (selectedKeys, _) => {
         selectedFile.next(selectedKeys.join('/'));
     };
 
     const treeData = useObservable(data);
 
+    if (!expandedKeys && selectedKeys) {
+        setExpandedKeys(getPathKeys(selectedKeys[0]));
+    }
+
     return (
         <div>
-            <Card cover={<Header />} variant="borderless" style={{ height: '90vh' }}>
+            <Card cover={<Header />} variant="borderless" style={{ height: '100vh' }}>
                 <Tree
                     showLine
                     switcherIcon={<DownOutlined />}
-                    defaultExpandedKeys={['0-0-0']}
+                    selectedKeys={selectedKeys}
                     onSelect={onSelect}
                     treeData={treeData}
+                    expandedKeys={[...expandedKeys || []]}
+                    onExpand={onExpand}
                 />
             </Card>
 

@@ -1,9 +1,11 @@
-import { from, ReplaySubject, switchMap } from "rxjs";
+import { BehaviorSubject, from, Subject, switchMap } from "rxjs";
 import JSZip from 'jszip';
 
 const MINECRAFT_JAR_URL = "https://piston-data.mojang.com/v1/objects/26551033b7b935436f3407b85d14cac835e65640/client.jar";
 
-export const minecraftJarBlob = new ReplaySubject<Blob>(1);
+export const minecraftVersions = new BehaviorSubject<string[]>(["25w45a"]);
+
+export const minecraftJarBlob = new Subject<Blob>();
 export const minecraftJar = minecraftJarBlob.pipe(
     switchMap(blob => from(JSZip.loadAsync(blob)))
 );
@@ -17,3 +19,6 @@ export async function downloadMinecraftJar(): Promise<Blob> {
     minecraftJarBlob.next(blob);
     return blob;
 }
+
+// Automatically download the Minecraft jar on module load
+downloadMinecraftJar();

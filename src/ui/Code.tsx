@@ -6,7 +6,12 @@ const Code = () => {
     const src = useObservable(currentSource);
 
     return (
-        <Editor height="95vh" defaultLanguage="java" theme="vs-dark" value={src} />
+        <Editor
+            height="100vh"
+            defaultLanguage="java"
+            theme="vs-dark"
+            value={src}
+            options={{ readOnly: true }} />
     );
 }
 
