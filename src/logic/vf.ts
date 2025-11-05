@@ -1,5 +1,5 @@
-import wasmPath from "../node_modules/@run-slicer/vf/vf.wasm?url";
-import loadPath from "../node_modules/@run-slicer/vf/vf.wasm-runtime.js?url";
+import wasmPath from "../../node_modules/@run-slicer/vf/vf.wasm?url";
+import loadPath from "../../node_modules/@run-slicer/vf/vf.wasm-runtime.js?url";
 
 export type Options = Record<string, string>;
 
