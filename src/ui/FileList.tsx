@@ -5,7 +5,7 @@ import { map, type Observable } from 'rxjs';
 import { classesList } from '../logic/JarFile';
 import { useObservable } from '../utils/UseObservable';
 import Header from './Header';
-import { selectedFile } from '../logic/State';
+import { selectedFile, setSelectedFile } from '../logic/State';
 import { useState } from 'react';
 import type { Key } from 'antd/es/table/interface';
 
@@ -76,8 +76,11 @@ const FileList = () => {
     };
 
     const selectedKeys = useObservable(selectedFileKeys);
+    const classes = useObservable(classesList);
     const onSelect: TreeProps['onSelect'] = (selectedKeys) => {
-        selectedFile.next(selectedKeys.join('/'));
+        if (selectedKeys.length === 0) return;
+        if (!classes || !classes.includes(selectedKeys[0] as string)) return;
+        setSelectedFile(selectedKeys.join('/'));
     };
 
     const treeData = useObservable(data);

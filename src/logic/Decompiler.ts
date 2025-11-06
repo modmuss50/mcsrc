@@ -6,7 +6,7 @@ import { selectedFile } from "./State";
 import { removeImports } from "./Settings";
 
 
-const decompilerOptions : Observable<Options> = removeImports.observable.pipe(
+const decompilerOptions: Observable<Options> = removeImports.observable.pipe(
     map(removeImports => (
         { "remove-imports": removeImports ? "1" : "0" }
     ))
@@ -25,20 +25,31 @@ export const currentSource = combineLatest([
 async function decompileClass(className: string, jar: JSZip, options: Options): Promise<string> {
     console.log(`Decompiling class: '${className}'`);
 
-    const source = await decompile(className.replace(".class", ""), {
-        source: async (name: string) => {
-            const file = jar.file(name + ".class");
-            if (file) {
-                const arrayBuffer = await file.async("arraybuffer");
-                return new Uint8Array(arrayBuffer);
-            }
+    const files = Object.keys(jar.files);
 
-            console.error(`File not found in Minecraft jar: ${name}`);
-            return null;
-        },
-        resources: Object.keys(jar.files).filter(f => f.endsWith('.class')).map(f => f.replace(".class", "")),
-        options
-    });
+    if (!files.includes(className)) {
+        console.error(`Class not found in Minecraft jar: ${className}`);
+        return `// Class not found: ${className}`;
+    }
 
-    return source;
+    try {
+        const source = await decompile(className.replace(".class", ""), {
+            source: async (name: string) => {
+                const file = jar.file(name + ".class");
+                if (file) {
+                    const arrayBuffer = await file.async("arraybuffer");
+                    return new Uint8Array(arrayBuffer);
+                }
+
+                console.error(`File not found in Minecraft jar: ${name}`);
+                return null;
+            },
+            resources: files.filter(f => f.endsWith('.class')).map(f => f.replace(".class", "")),
+            options
+        });
+        return source;
+    } catch (e) {
+        console.error(`Error during decompilation of class '${className}':`, e);
+        return `// Error during decompilation: ${e}`;
+    }
 }
