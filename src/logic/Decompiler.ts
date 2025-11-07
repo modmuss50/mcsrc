@@ -19,10 +19,10 @@ export const currentSource = combineLatest([
 ]).pipe(
     distinctUntilChanged(),
     throttleTime(250),
-    switchMap(([className, jar, options]) => from(decompileClass(className, jar, options)))
+    switchMap(([className, jar, options]) => from(tryDecompile(className, jar, options)))
 );
 
-async function decompileClass(className: string, jar: JSZip, options: Options): Promise<string> {
+export async function decompileClass(className: string, jar: JSZip, options: Options): Promise<string> {
     console.log(`Decompiling class: '${className}'`);
 
     const files = Object.keys(jar.files);
@@ -32,24 +32,27 @@ async function decompileClass(className: string, jar: JSZip, options: Options): 
         return `// Class not found: ${className}`;
     }
 
-    try {
-        const source = await decompile(className.replace(".class", ""), {
-            source: async (name: string) => {
-                const file = jar.file(name + ".class");
-                if (file) {
-                    const arrayBuffer = await file.async("arraybuffer");
-                    return new Uint8Array(arrayBuffer);
-                }
+    return await decompile(className.replace(".class", ""), {
+        source: async (name: string) => {
+            const file = jar.file(name + ".class");
+            if (file) {
+                const arrayBuffer = await file.async("arraybuffer");
+                return new Uint8Array(arrayBuffer);
+            }
 
-                console.error(`File not found in Minecraft jar: ${name}`);
-                return null;
-            },
-            resources: files.filter(f => f.endsWith('.class')).map(f => f.replace(".class", "")),
-            options
-        });
-        return source;
+            console.error(`File not found in Minecraft jar: ${name}`);
+            return null;
+        },
+        resources: files.filter(f => f.endsWith('.class')).map(f => f.replace(".class", "")),
+        options
+    });
+}
+
+async function tryDecompile(className: string, jar: JSZip, options: Options): Promise<string> {
+    try {
+        return await decompileClass(className, jar, options);
     } catch (e) {
-        console.error(`Error during decompilation of class '${className}':`, e);
-        return `// Error during decompilation: ${e}`;
+        console.error(`Decompilation failed for class '${className}':`, e);
+        return `// Decompilation failed: ${e}`;
     }
 }

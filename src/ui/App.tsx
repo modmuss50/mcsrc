@@ -4,6 +4,7 @@ import Code from "./Code.tsx";
 import ProgressModal from './ProgressModal.tsx';
 import SideBar from './SideBar.tsx';
 import { useState } from 'react';
+import IndexProgressModal from './IndexProgressModal.tsx';
 
 
 const App = () => {
@@ -20,6 +21,7 @@ const App = () => {
             }}
         >
             <ProgressModal />
+            <IndexProgressModal />
             <Splitter onResize={setSizes}>
                 <Splitter.Panel collapsible defaultSize="200px" min="5%" size={sizes[0]}>
                     <SideBar />
