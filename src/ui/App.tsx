@@ -2,7 +2,7 @@
 import { ConfigProvider, Splitter, theme } from 'antd';
 import Code from "./Code.tsx";
 import ProgressModal from './ProgressModal.tsx';
-import SideBar from './Sidebar.tsx';
+import SideBar from './SideBar.tsx';
 import { useState } from 'react';
 
 
