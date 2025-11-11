@@ -10,7 +10,7 @@ export interface State {
 const DEFAULT_STATE: State = {
   version: 0,
   minecraftVersion: "",
-  file: ""
+  file: "net/minecraft/ChatFormatting.class"
 };
 
 const getInitialState = (): State => {
@@ -23,7 +23,7 @@ const getInitialState = (): State => {
   }
 
   const version = parseInt(segments[0], 10);
-  var minecraftVersion = decodeURIComponent(segments[1]);
+  let minecraftVersion = decodeURIComponent(segments[1]);
   const filePath = segments.slice(2).join('/');
 
   // Backwards compatibility with the incorrect version name used previously
@@ -53,6 +53,19 @@ state.subscribe(s => {
 
   document.title = s.file.replace('.class', '');
 });
+
+export function updateSelectedMinecraftVersion() {
+  const previous = state.value;
+
+  if (previous.minecraftVersion === selectedMinecraftVersion.value) {
+    return;
+  }
+
+  state.next({
+    ...previous,
+    minecraftVersion: selectedMinecraftVersion.value || ""
+  });
+}
 
 export function setSelectedFile(file: string) {
   state.next({

@@ -1,8 +1,9 @@
-import { map } from 'rxjs';
+import { distinct, distinctUntilChanged, map } from 'rxjs';
 import { minecraftJar } from './MinecraftApi';
 
 export const fileList = minecraftJar.pipe(
-    map(jar => Object.keys(jar.files))
+    distinctUntilChanged(),
+    map(jar => Object.keys(jar.zip.files))
 );
 
 // File list that only contains outer class files

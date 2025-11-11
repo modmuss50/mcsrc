@@ -1,6 +1,7 @@
-import { BehaviorSubject, distinctUntilChanged, filter, from, map, shareReplay, switchMap, tap } from "rxjs";
+import { BehaviorSubject, combineLatest, distinctUntilChanged, filter, from, map, shareReplay, switchMap, tap } from "rxjs";
 import JSZip from 'jszip';
 import { agreedEula } from "./Settings";
+import { state, updateSelectedMinecraftVersion } from "./State";
 
 const CACHE_NAME = 'mcsrc-v1';
 const FABRIC_EXPERIMENTAL_VERSIONS_URL = "https://maven.fabricmc.net/net/minecraft/experimental_versions.json";
@@ -28,6 +29,16 @@ interface VersionManifest {
     };
 }
 
+interface JarBlob {
+    version: string;
+    blob: Blob;
+}
+
+interface Jar {
+    version: string;
+    zip: JSZip;
+}
+
 export const minecraftVersions = new BehaviorSubject<VersionListEntry[]>([]);
 export const minecraftVersionIds = minecraftVersions.pipe(
     map(versions => versions.map(v => v.id))
@@ -38,6 +49,7 @@ export const selectedMinecraftVersion = new BehaviorSubject<string | null>(null)
 export const minecraftJarBlob = selectedMinecraftVersion.pipe(
     filter(id => id !== null),
     distinctUntilChanged(),
+    tap((versionId) => updateSelectedMinecraftVersion()),
     map(versionId => {
         return getVersionEntryById(versionId!)!;
     }),
@@ -48,8 +60,8 @@ export const minecraftJarBlob = selectedMinecraftVersion.pipe(
 );
 
 export const minecraftJar = minecraftJarBlob.pipe(
-    tap(() => console.log('Loading Minecraft jar')),
-    switchMap(blob => from(JSZip.loadAsync(blob))),
+    tap((blob) => console.log(`Loading Minecraft jar ${blob.version}`)),
+    switchMap(blob => from(openJar(blob))),
     shareReplay({ bufferSize: 1, refCount: false })
 );
 
@@ -97,7 +109,7 @@ async function cachedFetch(url: string): Promise<Response> {
     return response;
 }
 
-async function downloadMinecraftJar(version: VersionListEntry): Promise<Blob> {
+async function downloadMinecraftJar(version: VersionListEntry): Promise<JarBlob> {
     console.log(`Downloading Minecraft jar for version: ${version.id}`);
     const versionManifest = await fetchVersionManifest(version);
     const response = await cachedFetch(versionManifest.downloads.client.url);
@@ -111,7 +123,7 @@ async function downloadMinecraftJar(version: VersionListEntry): Promise<Blob> {
     if (!response.body || total === 0) {
         const blob = await response.blob();
         downloadProgress.next(undefined);
-        return blob;
+        return { version: version.id, blob };
     }
 
     const reader = response.body.getReader();
@@ -131,24 +143,29 @@ async function downloadMinecraftJar(version: VersionListEntry): Promise<Blob> {
 
     const blob = new Blob(chunks);
     downloadProgress.next(undefined)
-    return blob;
+    return { version: version.id, blob };
 }
 
-async function initialize() {
+async function openJar(blob: JarBlob): Promise<Jar> {
+    const zip = await JSZip.loadAsync(blob.blob);
+    return { version: blob.version, zip };
+}
+
+async function initialize(version: string | null = null) {
     const versionsList = await fetchVersions();
     const debofVersions = versionsList.versions.filter(v => v.type === "unobfuscated").reverse();
     minecraftVersions.next(debofVersions);
 
     // This triggers the download
-    selectedMinecraftVersion.next(debofVersions[0].id);
+    selectedMinecraftVersion.next(version || debofVersions[0].id);
 }
 
 let hasInitialized = false;
 
 // Automatically download the Minecraft jar only when the user has agreed to the EULA
-agreedEula.observable.subscribe(seen => {
-    if (seen && !hasInitialized) {
+combineLatest([agreedEula.observable, state]).subscribe(([agreed, currentState]) => {
+    if (agreed && !hasInitialized) {
         hasInitialized = true;
-        initialize();
+        initialize(currentState.minecraftVersion);
     }
 });
