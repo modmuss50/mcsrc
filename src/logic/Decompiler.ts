@@ -35,7 +35,7 @@ export const currentResult = combineLatest([
 ]).pipe(
     distinctUntilChanged(),
     throttleTime(250),
-    switchMap(([className, jar, options]) => from(decompileClass(className, jar, options))),
+    switchMap(([className, jar, options]) => from(decompileClass(className, jar.zip, options))),
     shareReplay({ bufferSize: 1, refCount: false })
 );
 
