@@ -3,6 +3,7 @@ import { minecraftVersionIds, selectedMinecraftVersion } from "../logic/Minecraf
 import { useObservable } from "../utils/UseObservable";
 import AboutModal from "./AboutModal";
 import SettingsModal from "./SettingsModal";
+import { diffView } from "../logic/Diff";
 
 const Header = () => {
     return (
@@ -23,10 +24,16 @@ export const HeaderBody = () => {
             <Select
                 value={currentVersion || versions?.[0]}
                 onChange={(v) => {
+                    if (v == "diff") {
+                        diffView.next(true);
+                        return;
+                    }
+
                     console.log(`Selected Minecraft version: ${v}`);
                     selectedMinecraftVersion.next(v);
                 }}
             >
+                <Select.Option key={"diff"} value={"diff"}>Compare (beta)</Select.Option>
                 {versions?.map(v => (
                     <Select.Option key={v} value={v}>{v}</Select.Option>
                 ))}

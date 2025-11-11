@@ -1,0 +1,127 @@
+import { BehaviorSubject, combineLatest, from, map, Observable, switchMap } from "rxjs";
+import { minecraftJar, minecraftJarBlob, minecraftJarBlobPipeline, minecraftJarPipeline, selectedMinecraftVersion, type Jar, type JarBlob } from "./MinecraftApi";
+import { currentResult, decompileResultPipeline, type DecompileResult } from "./Decompiler";
+
+export const diffView = new BehaviorSubject<boolean>(false);
+
+export interface DiffSide {
+    selectedVersion: BehaviorSubject<string | null>;
+    blob: Observable<JarBlob>;
+    jar: Observable<Jar>;
+    entries: Observable<Map<string, number>>;
+    result: Observable<DecompileResult>;
+}
+
+export const leftDownloadProgress = new BehaviorSubject<number | undefined>(undefined);
+
+let leftDiff: DiffSide | null = null;
+export function getLeftDiff(): DiffSide {
+    if (!leftDiff) {
+        leftDiff = {} as DiffSide;
+        leftDiff.selectedVersion = new BehaviorSubject<string | null>(null);
+        leftDiff.blob = minecraftJarBlobPipeline(leftDiff.selectedVersion, leftDownloadProgress);
+        leftDiff.jar = minecraftJarPipeline(leftDiff.blob);
+        leftDiff.entries = leftDiff.jar.pipe(
+            switchMap(jar => from(getEntriesWithCRC(jar)))
+        );
+        leftDiff.result = decompileResultPipeline(leftDiff.jar);
+    }
+    return leftDiff;
+}
+
+let rightDiff: DiffSide | null = null;
+export function getRightDiff(): DiffSide {
+    if (!rightDiff) {
+        rightDiff = {
+            selectedVersion: selectedMinecraftVersion,
+            blob: minecraftJarBlob,
+            jar: minecraftJar,
+            entries: minecraftJar.pipe(
+                switchMap(jar => from(getEntriesWithCRC(jar)))
+            ),
+            result: currentResult
+        };
+    }
+    return rightDiff;
+}
+
+let diffChanges: Observable<Map<string, ChangeState>> | null = null;
+export function getDiffChanges(): Observable<Map<string, ChangeState>> {
+    if (!diffChanges) {
+        diffChanges = combineLatest([
+            getLeftDiff().entries,
+            getRightDiff().entries
+        ]).pipe(
+            map(([leftEntries, rightEntries]) => {
+                return getChangedEntries(leftEntries, rightEntries);
+            })
+        );
+    }
+    return diffChanges;
+}
+
+
+// Copied from node_modules/jszip/index.d.ts
+interface FileData {
+    compressedSize: number;
+    uncompressedSize: number;
+    crc32: number;
+    compression: object;
+    compressedContent: string | ArrayBuffer | Uint8Array | Buffer;
+}
+
+export type ChangeState = "added" | "deleted" | "modified";
+
+async function getEntriesWithCRC(jar: Jar): Promise<Map<string, number>> {
+    const entries = new Map<string, number>();
+
+    for (const [path, file] of Object.entries(jar.zip.files)) {
+        if (!path.endsWith('.class')) {
+            continue;
+        }
+
+        const data = (file as any)._data as FileData;
+
+        let className = path.substring(0, path.length - 6);
+        if (path.includes('$')) {
+            className = className.split('$')[0];
+        }
+
+        if (entries.has(className)) {
+            const existingCRC = entries.get(className)!;
+            const combinedCRC = existingCRC ^ data.crc32; // This is likely not a good way to combine CRCs
+            entries.set(className, combinedCRC);
+        } else {
+            entries.set(className, data.crc32);
+        }
+    }
+
+    return entries;
+}
+
+function getChangedEntries(
+    leftEntries: Map<string, number>,
+    rightEntries: Map<string, number>
+): Map<string, ChangeState> {
+    const changes = new Map<string, ChangeState>();
+
+    const allKeys = new Set<string>([
+        ...leftEntries.keys(),
+        ...rightEntries.keys()
+    ]);
+
+    for (const key of allKeys) {
+        const leftCRC = leftEntries.get(key);
+        const rightCRC = rightEntries.get(key);
+
+        if (leftCRC === undefined) {
+            changes.set(key, "added");
+        } else if (rightCRC === undefined) {
+            changes.set(key, "deleted");
+        } else if (leftCRC !== rightCRC) {
+            changes.set(key, "modified");
+        }
+    }
+
+    return changes;
+}

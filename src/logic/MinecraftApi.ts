@@ -1,4 +1,4 @@
-import { BehaviorSubject, combineLatest, distinctUntilChanged, filter, from, map, shareReplay, switchMap, tap } from "rxjs";
+import { BehaviorSubject, combineLatest, distinctUntilChanged, filter, from, map, shareReplay, switchMap, tap, Observable } from "rxjs";
 import JSZip from 'jszip';
 import { agreedEula } from "./Settings";
 import { state, updateSelectedMinecraftVersion } from "./State";
@@ -29,12 +29,12 @@ interface VersionManifest {
     };
 }
 
-interface JarBlob {
+export interface JarBlob {
     version: string;
     blob: Blob;
 }
 
-interface Jar {
+export interface Jar {
     version: string;
     zip: JSZip;
 }
@@ -45,27 +45,28 @@ export const minecraftVersionIds = minecraftVersions.pipe(
 );
 export const selectedMinecraftVersion = new BehaviorSubject<string | null>(null);
 
-// Refresh the Minecraft jar when the selected version changes
-export const minecraftJarBlob = selectedMinecraftVersion.pipe(
-    filter(id => id !== null),
-    distinctUntilChanged(),
-    tap((versionId) => updateSelectedMinecraftVersion()),
-    map(versionId => {
-        return getVersionEntryById(versionId!)!;
-    }),
-    switchMap(versionEntry => {
-        return from(downloadMinecraftJar(versionEntry));
-    }),
-    shareReplay({ bufferSize: 1, refCount: false })
-);
-
-export const minecraftJar = minecraftJarBlob.pipe(
-    tap((blob) => console.log(`Loading Minecraft jar ${blob.version}`)),
-    switchMap(blob => from(openJar(blob))),
-    shareReplay({ bufferSize: 1, refCount: false })
-);
-
 export const downloadProgress = new BehaviorSubject<number | undefined>(undefined);
+
+export const minecraftJarBlob = minecraftJarBlobPipeline(selectedMinecraftVersion, downloadProgress);
+export function minecraftJarBlobPipeline(source$: Observable<string | null>, progress: BehaviorSubject<number | undefined>): Observable<JarBlob> {
+    return source$.pipe(
+        filter(id => id !== null),
+        distinctUntilChanged(),
+        tap(versionId => updateSelectedMinecraftVersion()),
+        map(versionId => getVersionEntryById(versionId!)!),
+        switchMap(versionEntry => from(downloadMinecraftJar(versionEntry, progress))),
+        shareReplay({ bufferSize: 1, refCount: false })
+    );
+}
+
+export const minecraftJar = minecraftJarPipeline(minecraftJarBlob);
+export function minecraftJarPipeline(source$: Observable<JarBlob>): Observable<Jar> {
+    return source$.pipe(
+        tap((blob) => console.log(`Loading Minecraft jar ${blob.version}`)),
+        switchMap(blob => from(openJar(blob))),
+        shareReplay({ bufferSize: 1, refCount: false })
+    );
+}
 
 async function getJson<T>(url: string): Promise<T> {
     console.log(`Fetching JSON from ${url}`);
@@ -109,7 +110,7 @@ async function cachedFetch(url: string): Promise<Response> {
     return response;
 }
 
-async function downloadMinecraftJar(version: VersionListEntry): Promise<JarBlob> {
+async function downloadMinecraftJar(version: VersionListEntry, progress: BehaviorSubject<number | undefined>): Promise<JarBlob> {
     console.log(`Downloading Minecraft jar for version: ${version.id}`);
     const versionManifest = await fetchVersionManifest(version);
     const response = await cachedFetch(versionManifest.downloads.client.url);
@@ -122,7 +123,7 @@ async function downloadMinecraftJar(version: VersionListEntry): Promise<JarBlob>
 
     if (!response.body || total === 0) {
         const blob = await response.blob();
-        downloadProgress.next(undefined);
+        progress.next(undefined);
         return { version: version.id, blob };
     }
 
@@ -137,12 +138,12 @@ async function downloadMinecraftJar(version: VersionListEntry): Promise<JarBlob>
         chunks.push(value);
         receivedLength += value.length;
 
-        const progress = Math.round((receivedLength / total) * 100);
-        downloadProgress.next(progress);
+        const percent = Math.round((receivedLength / total) * 100);
+        progress.next(percent);
     }
 
     const blob = new Blob(chunks);
-    downloadProgress.next(undefined)
+    progress.next(undefined)
     return { version: version.id, blob };
 }
 

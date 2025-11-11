@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { combineLatest, distinctUntilChanged, from, map, Observable, shareReplay, switchMap, throttleTime } from "rxjs";
-import { minecraftJar } from "./MinecraftApi";
+import { minecraftJar, type Jar } from "./MinecraftApi";
 import type JSZip from "jszip";
 import { decompile, type Options, type TokenCollector } from "./vf";
 import { selectedFile } from "./State";
@@ -28,16 +28,19 @@ const decompilerOptions: Observable<Options> = removeImports.observable.pipe(
     ))
 );
 
-export const currentResult = combineLatest([
-    selectedFile,
-    minecraftJar,
-    decompilerOptions
-]).pipe(
-    distinctUntilChanged(),
-    throttleTime(250),
-    switchMap(([className, jar, options]) => from(decompileClass(className, jar.zip, options))),
-    shareReplay({ bufferSize: 1, refCount: false })
-);
+export const currentResult = decompileResultPipeline(minecraftJar);
+export function decompileResultPipeline(jar: Observable<Jar>): Observable<DecompileResult> {
+    return combineLatest([
+        selectedFile,
+        jar,
+        decompilerOptions
+    ]).pipe(
+        distinctUntilChanged(),
+        throttleTime(250),
+        switchMap(([className, jar, options]) => from(decompileClass(className, jar.zip, options))),
+        shareReplay({ bufferSize: 1, refCount: false })
+    );
+}
 
 export const currentSource = currentResult.pipe(
     map(result => result.source)

@@ -7,10 +7,14 @@ import { useObservable } from '../utils/UseObservable.ts';
 import { isThin } from '../logic/Browser.ts';
 import { MenuFoldOutlined } from '@ant-design/icons';
 import { HeaderBody } from './Header.tsx';
+import { diffView } from '../logic/Diff.ts';
+import DiffView from './diff/DiffView.tsx';
 
 
 const App = () => {
     const isSmall = useObservable(isThin);
+    const enableDiff = useObservable(diffView);
+
     return (
         <ConfigProvider
             theme={{
@@ -23,7 +27,7 @@ const App = () => {
             }}
         >
             <ProgressModal />
-            {isSmall ? <MobileApp /> : <LargeApp />}
+            {enableDiff ? <DiffView /> : isSmall ? <MobileApp /> : <LargeApp />}
         </ConfigProvider>
     )
 };
