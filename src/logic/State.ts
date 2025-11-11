@@ -1,5 +1,6 @@
 import { BehaviorSubject, map } from "rxjs";
 import { selectedMinecraftVersion } from "./MinecraftApi";
+import { diffView } from "./Diff";
 
 export interface State {
   version: number; // Allows us to change the permalink structure in the future
@@ -48,7 +49,12 @@ state.subscribe(s => {
     return;
   }
 
-  const url = `#${s.version}/${s.minecraftVersion}/${s.file.replace(".class", "")}`;
+  let url = `#${s.version}/${s.minecraftVersion}/${s.file.replace(".class", "")}`;
+
+  if (diffView.value) {
+    url = "";
+  }
+
   window.history.replaceState({}, '', url);
 
   document.title = s.file.replace('.class', '');
