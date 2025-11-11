@@ -6,6 +6,7 @@ import { editor } from "monaco-editor";
 import { isThin } from '../logic/Browser';
 import { setSelectedFile } from '../logic/State';
 import { classesList } from '../logic/JarFile';
+import { CodeHeader } from './CodeHeader';
 
 const Code = () => {
     const monaco = useMonaco();
@@ -73,18 +74,21 @@ const Code = () => {
     }, [decompileResult]);
 
     return (
-        <Editor
-            height="100vh"
-            defaultLanguage="java"
-            theme="vs-dark"
-            value={decompileResult?.source}
-            options={{
-                readOnly: true,
-                domReadOnly: true,
-                tabSize: 3,
-                minimap: { enabled: !hideMinimap }
-            }}
-            onMount={(editor) => { editorRef.current = editor; }} />
+        <>
+            <CodeHeader />
+            <Editor
+                height="100vh"
+                defaultLanguage="java"
+                theme="vs-dark"
+                value={decompileResult?.source}
+                options={{
+                    readOnly: true,
+                    domReadOnly: true,
+                    tabSize: 3,
+                    minimap: { enabled: !hideMinimap }
+                }}
+                onMount={(editor) => { editorRef.current = editor; }} />
+        </>
     );
 }
 
