@@ -9,7 +9,8 @@ import { HeaderBody } from './Header.tsx';
 import { diffView } from '../logic/Diff.ts';
 import DiffView from './diff/DiffView.tsx';
 import { TabsProvider } from './tabs/TabsProvider.tsx';
-import { CodeHeader } from './CodeHeader.tsx';
+import { TabsHeader } from './TabsHeader.tsx';
+import { FilepathHeader } from './FilepathHeader.tsx';
 
 const App = () => {
     const isSmall = useObservable(isThin);
@@ -45,7 +46,8 @@ const LargeApp = () => {
                 <SideBar />
             </Splitter.Panel>
             <Splitter.Panel size={sizes[1]}>
-                <CodeHeader />
+                <TabsHeader />
+                <FilepathHeader />
                 <Code />
             </Splitter.Panel>
         </Splitter>
@@ -75,7 +77,8 @@ const MobileApp = () => {
             >
                 <SideBar />
             </Drawer>
-            <CodeHeader showDrawer={showDrawer} />
+            <TabsHeader showDrawer={showDrawer} />
+            <FilepathHeader />
             <Code />
         </Flex>
     )
