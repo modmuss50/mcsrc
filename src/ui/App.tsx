@@ -1,15 +1,17 @@
-import { ConfigProvider, Drawer, Flex, FloatButton, Splitter, theme } from 'antd';
+import { Button, ConfigProvider, Drawer, Flex, Splitter, theme } from 'antd';
 import Code from "./Code.tsx";
 import ProgressModal from './ProgressModal.tsx';
 import SideBar from './SideBar.tsx';
 import { useState } from 'react';
 import { useObservable } from '../utils/UseObservable.ts';
 import { isThin } from '../logic/Browser.ts';
-import { MenuFoldOutlined } from '@ant-design/icons';
 import { HeaderBody } from './Header.tsx';
 import { diffView } from '../logic/Diff.ts';
 import DiffView from './diff/DiffView.tsx';
-
+import { FilepathHeader } from './FilepathHeader.tsx';
+import { enableTabs } from '../logic/Settings.ts';
+import { MenuFoldOutlined } from '@ant-design/icons';
+import { TabsComponent } from './TabsComponent.tsx';
 
 const App = () => {
     const isSmall = useObservable(isThin);
@@ -23,6 +25,9 @@ const App = () => {
                     Card: {
                         bodyPadding: 4,
                     },
+                    Tabs: {
+                        horizontalMargin: "0",
+                    }
                 },
             }}
         >
@@ -34,12 +39,16 @@ const App = () => {
 
 const LargeApp = () => {
     const [sizes, setSizes] = useState<(number | string)[]>(['25%', '75%']);
+    const tabsEnabled = useObservable(enableTabs.observable);
+
     return (
         <Splitter onResize={setSizes}>
             <Splitter.Panel collapsible defaultSize="200px" min="5%" size={sizes[0]}>
                 <SideBar />
             </Splitter.Panel>
             <Splitter.Panel size={sizes[1]}>
+                {tabsEnabled && <TabsComponent />}
+                <FilepathHeader />
                 <Code />
             </Splitter.Panel>
         </Splitter>
@@ -49,6 +58,7 @@ const LargeApp = () => {
 
 const MobileApp = () => {
     const [open, setOpen] = useState(false);
+    const tabsEnabled = useObservable(enableTabs.observable);
 
     const showDrawer = () => {
         setOpen(true);
@@ -60,7 +70,6 @@ const MobileApp = () => {
 
     return (
         <Flex vertical={true}>
-            <FloatButton type="primary" onClick={showDrawer} icon={<MenuFoldOutlined />} style={{ top: 24, left: 24 }} />
             <Drawer
                 onClose={onClose}
                 open={open}
@@ -70,6 +79,20 @@ const MobileApp = () => {
             >
                 <SideBar />
             </Drawer>
+            <Flex>
+                <Button
+                    size="large"
+                    type="primary"
+                    onClick={showDrawer}
+                    icon={<MenuFoldOutlined />}
+                    style={{
+                        flexShrink: 0,
+                        margin: ".5rem .5rem .5rem 1.5rem"
+                    }}
+                />
+                {tabsEnabled && <TabsComponent />}
+            </Flex>
+            <FilepathHeader />
             <Code />
         </Flex>
     )

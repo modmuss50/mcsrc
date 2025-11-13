@@ -4,10 +4,10 @@ import { DownOutlined } from '@ant-design/icons';
 import { map, type Observable } from 'rxjs';
 import { classesList } from '../logic/JarFile';
 import { useObservable } from '../utils/UseObservable';
-import { selectedFile, setSelectedFile } from '../logic/State';
+import { selectedFile } from '../logic/State';
 import { useState } from 'react';
 import type { Key } from 'antd/es/table/interface';
-
+import { openTab } from '../logic/Tabs';
 
 // Sorts nodes with children first (directories before files), then alphabetically
 const sortTreeNodes = (nodes: TreeDataNode[] = []) => {
@@ -81,7 +81,7 @@ const FileList = () => {
     const onSelect: TreeProps['onSelect'] = (selectedKeys) => {
         if (selectedKeys.length === 0) return;
         if (!classes || !classes.includes(selectedKeys[0] as string)) return;
-        setSelectedFile(selectedKeys.join('/'));
+        openTab(selectedKeys.join("/"));
     };
 
     const treeData = useObservable(data);
@@ -99,6 +99,9 @@ const FileList = () => {
             treeData={treeData}
             expandedKeys={[...expandedKeys || []]}
             onExpand={onExpand}
+            titleRender={(nodeData) => (
+                <span style={{ userSelect: "none" }}>{nodeData.title?.toString()}</span>
+            )}
         />
     );
 };

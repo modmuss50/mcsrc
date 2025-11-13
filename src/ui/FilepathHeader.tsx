@@ -1,22 +1,20 @@
-import { useObservable } from "../utils/UseObservable"
-import { isThin } from "../logic/Browser"
-import { selectedFile } from "../logic/State"
 import { theme } from "antd";
+import { selectedFile } from "../logic/State";
+import { useObservable } from "../utils/UseObservable";
 
-export const CodeHeader = () => {
+export const FilepathHeader = () => {
     const { token } = theme.useToken();
-    const isMobile = useObservable(isThin);
     const info = useObservable(selectedFile);
 
-    return info ? (
+    return info && (
         <div style={{
             display: "flex",
             width: "100%",
             boxSizing: "border-box",
             alignItems: "center",
             justifyContent: "left",
-            padding: `.5rem 1rem .5rem ${isMobile ? "67px" : "1rem"}`, /* temp mobile padding because of FloatButton*/
-            fontFamily: token.fontFamily
+            padding: ".25rem 1rem",
+            fontFamily: token.fontFamily,
         }}>
             <div style={{
                 whiteSpace: "nowrap",
@@ -26,12 +24,12 @@ export const CodeHeader = () => {
                 color: "white"
             }}>
                 {info.replace(".class", "").split("/").map((path, i, arr) => (
-                    <>
+                    <span key={path}>
                         <span style={{ color: i < arr.length - 1 ? "gray" : "white" }}>{path}</span>
                         {i < arr.length - 1 && <span style={{ color: "gray" }}>/</span>}
-                    </>
+                    </span>
                 ))}
             </div>
         </div>
-    ) : null
+    )
 }

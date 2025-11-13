@@ -1,10 +1,12 @@
-import { Table, Tag, Input, Select, Flex } from 'antd';
+import {Table, Tag, Input, Button, Flex, theme} from 'antd';
 import DiffVersionSelection from './DiffVersionSelection';
 import { getDiffChanges, type ChangeState } from '../../logic/Diff';
 import { BehaviorSubject, map, combineLatest } from 'rxjs';
 import { useObservable } from '../../utils/UseObservable';
 import type { SearchProps } from 'antd/es/input';
-import { selectedFile, setSelectedFile, state } from '../../logic/State';
+import { selectedFile, setSelectedFile } from '../../logic/State';
+import { diffView } from "../../logic/Diff";
+import { isDecompiling } from "../../logic/Decompiler.ts";
 
 const statusColors: Record<ChangeState, string> = {
     modified: 'gold',
@@ -50,20 +52,27 @@ const entries = combineLatest([getDiffChanges(), searchQuery]).pipe(
 const DiffFileList = () => {
     const dataSource = useObservable(entries) || [];
     const currentFile = useObservable(selectedFile);
+    const loading = useObservable(isDecompiling);
+    const { token } = theme.useToken();
 
     const onChange: SearchProps['onChange'] = (e) => {
         searchQuery.next(e.target.value);
     };
 
+    const handleExitDiff = () => {
+      diffView.next(false);
+    }
+
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', marginLeft: 8, marginRight: 8 }}>
             <div
                 style={{
                     position: 'sticky',
                     top: 0,
                     zIndex: 10,
-                    marginBottom: 12,
+                    paddingBottom: 12,
                     paddingTop: 12,
+                    backgroundColor: token.colorBgContainer
                 }}
             >
                 <Input.Search
@@ -84,8 +93,27 @@ const DiffFileList = () => {
                 >
                     <DiffVersionSelection />
                 </Flex>
+                <Button
+                    type="default"
+                    variant={"outlined"}
+                    onClick={handleExitDiff}
+                    style={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 0
+                    }}
+                >
+                    Exit Diff
+                </Button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div
+                className={"webkit-scrollbar-hide"}
+                style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    scrollbarWidth: "none"
+                }}
+            >
                 <Table
                     dataSource={dataSource}
                     columns={columns}
@@ -98,9 +126,15 @@ const DiffFileList = () => {
                     }
                     onRow={(record) => ({
                         onClick: () => {
+                            if(loading) return;
+                            if(currentFile === record.file + ".class") return;
+
                             setSelectedFile(record.file + ".class");
                         }
                     })}
+                    style={{
+                        cursor: loading ? 'not-allowed' : 'pointer'
+                    }}
                 />
             </div>
         </div>

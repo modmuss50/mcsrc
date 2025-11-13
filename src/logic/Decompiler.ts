@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { combineLatest, distinctUntilChanged, from, map, Observable, shareReplay, switchMap, throttleTime } from "rxjs";
+import {
+    BehaviorSubject,
+    combineLatest, distinctUntilChanged, from, map, Observable, shareReplay, switchMap, tap, throttleTime
+} from "rxjs";
 import { minecraftJar, type MinecraftJar } from "./MinecraftApi";
 import { decompile, type Options, type TokenCollector } from "./vf";
 import { selectedFile } from "./State";
@@ -21,6 +24,14 @@ export interface ClassToken {
     declaration: boolean
 }
 
+const decompilerCounter = new BehaviorSubject<number>(0);
+
+export const isDecompiling = decompilerCounter.pipe(
+    map(count => count > 0),
+    distinctUntilChanged(),
+    shareReplay({ bufferSize: 1, refCount: true })
+)
+
 const decompilerOptions: Observable<Options> = removeImports.observable.pipe(
     map(removeImports => (
         { "remove-imports": removeImports ? "1" : "0" }
@@ -35,8 +46,10 @@ export function decompileResultPipeline(jar: Observable<MinecraftJar>): Observab
         decompilerOptions
     ]).pipe(
         distinctUntilChanged(),
+        tap(() => decompilerCounter.next(decompilerCounter.value + 1)),
         throttleTime(250),
         switchMap(([className, jar, options]) => from(decompileClass(className, jar, options))),
+        tap(() => decompilerCounter.next(decompilerCounter.value - 1)),
         shareReplay({ bufferSize: 1, refCount: false })
     );
 }

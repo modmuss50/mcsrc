@@ -4,9 +4,8 @@ import { currentResult } from '../logic/Decompiler';
 import { useEffect, useRef } from 'react';
 import { editor } from "monaco-editor";
 import { isThin } from '../logic/Browser';
-import { setSelectedFile } from '../logic/State';
 import { classesList } from '../logic/JarFile';
-import { CodeHeader } from './CodeHeader';
+import { openTab } from '../logic/Tabs';
 
 const Code = () => {
     const monaco = useMonaco();
@@ -42,7 +41,7 @@ const Code = () => {
                         console.log(`Found token for definition: ${className} at offset ${token.start}`);
 
                         if (classList && classList.includes(className)) {
-                            setSelectedFile(className);
+                            openTab(className);
                             return null;
                         }
 
@@ -74,21 +73,18 @@ const Code = () => {
     }, [decompileResult]);
 
     return (
-        <>
-            <CodeHeader />
-            <Editor
-                height="100vh"
-                defaultLanguage="java"
-                theme="vs-dark"
-                value={decompileResult?.source}
-                options={{
-                    readOnly: true,
-                    domReadOnly: true,
-                    tabSize: 3,
-                    minimap: { enabled: !hideMinimap }
-                }}
-                onMount={(editor) => { editorRef.current = editor; }} />
-        </>
+        <Editor
+            height="100vh"
+            defaultLanguage="java"
+            theme="vs-dark"
+            value={decompileResult?.source}
+            options={{
+                readOnly: true,
+                domReadOnly: true,
+                tabSize: 3,
+                minimap: { enabled: !hideMinimap }
+            }}
+            onMount={(editor) => { editorRef.current = editor; }} />
     );
 }
 

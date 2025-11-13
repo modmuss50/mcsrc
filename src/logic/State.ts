@@ -1,4 +1,4 @@
-import { BehaviorSubject, map } from "rxjs";
+import { BehaviorSubject, distinctUntilChanged, map } from "rxjs";
 import { selectedMinecraftVersion } from "./MinecraftApi";
 import { diffView } from "./Diff";
 
@@ -41,7 +41,8 @@ const getInitialState = (): State => {
 
 export const state = new BehaviorSubject<State>(getInitialState());
 export const selectedFile = state.pipe(
-  map(s => s.file)
+  map(s => s.file),
+  distinctUntilChanged()
 );
 
 state.subscribe(s => {
