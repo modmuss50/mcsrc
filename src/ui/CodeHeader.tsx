@@ -1,24 +1,40 @@
 import { useObservable } from "../utils/UseObservable"
-import { isThin } from "../logic/Browser"
 import { selectedFile } from "../logic/State"
-import { theme } from "antd";
+import { Button, theme } from "antd";
 import { TabsComponent } from "./tabs/TabsComponent";
+import { MenuFoldOutlined } from '@ant-design/icons';
 
-export const CodeHeader = () => {
+export const CodeHeader = ({ showDrawer }: { showDrawer?: () => void }) => {
     const { token } = theme.useToken();
-    const isMobile = useObservable(isThin);
     const info = useObservable(selectedFile);
 
     return info ? (
         <>
-            <TabsComponent />
+            <div style={{
+                display: "flex",
+                alignItems: "center"
+            }}>
+                {showDrawer &&
+                    <Button
+                        size="large"
+                        type="primary"
+                        onClick={() => showDrawer?.()}
+                        icon={<MenuFoldOutlined />}
+                        style={{
+                            flexShrink: 0,
+                            margin: ".5rem .5rem .5rem 1.5rem"
+                        }}
+                    />
+                }
+                <div style={{ overflowX: "auto" }}><TabsComponent /></div>
+            </div>
             <div style={{
                 display: "flex",
                 width: "100%",
                 boxSizing: "border-box",
                 alignItems: "center",
                 justifyContent: "left",
-                padding: `.5rem 1rem .5rem ${isMobile ? "67px" : "1rem"}`, /* temp mobile padding because of FloatButton*/
+                padding: ".5rem 1rem",
                 fontFamily: token.fontFamily
             }}>
                 <div style={{

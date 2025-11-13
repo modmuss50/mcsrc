@@ -1,15 +1,15 @@
-import { ConfigProvider, Drawer, Flex, FloatButton, Splitter, theme } from 'antd';
+import { ConfigProvider, Drawer, Flex, Splitter, theme } from 'antd';
 import Code from "./Code.tsx";
 import ProgressModal from './ProgressModal.tsx';
 import SideBar from './SideBar.tsx';
 import { useState } from 'react';
 import { useObservable } from '../utils/UseObservable.ts';
 import { isThin } from '../logic/Browser.ts';
-import { MenuFoldOutlined } from '@ant-design/icons';
 import { HeaderBody } from './Header.tsx';
 import { diffView } from '../logic/Diff.ts';
 import DiffView from './diff/DiffView.tsx';
 import { TabsProvider } from './tabs/TabsProvider.tsx';
+import { CodeHeader } from './CodeHeader.tsx';
 
 const App = () => {
     const isSmall = useObservable(isThin);
@@ -45,6 +45,7 @@ const LargeApp = () => {
                 <SideBar />
             </Splitter.Panel>
             <Splitter.Panel size={sizes[1]}>
+                <CodeHeader />
                 <Code />
             </Splitter.Panel>
         </Splitter>
@@ -65,7 +66,6 @@ const MobileApp = () => {
 
     return (
         <Flex vertical={true}>
-            <FloatButton type="primary" onClick={showDrawer} icon={<MenuFoldOutlined />} style={{ top: 24, left: 24 }} />
             <Drawer
                 onClose={onClose}
                 open={open}
@@ -75,6 +75,7 @@ const MobileApp = () => {
             >
                 <SideBar />
             </Drawer>
+            <CodeHeader showDrawer={showDrawer} />
             <Code />
         </Flex>
     )
