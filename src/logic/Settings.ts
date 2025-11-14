@@ -5,7 +5,7 @@ export class BooleanSetting {
     private subject: BehaviorSubject<boolean>;
 
     constructor(key: string, defaultValue: boolean) {
-        const stored = localStorage.getItem(`setting_${key}`);
+        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`setting_${key}`) : null;
         const initialValue = stored !== null ? stored === 'true' : defaultValue;
 
         this.key = key;

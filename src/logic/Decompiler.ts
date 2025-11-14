@@ -59,7 +59,7 @@ export const currentSource = currentResult.pipe(
     map(result => result.source)
 );
 
-async function decompileClass(className: string, jar: Jar, options: Options): Promise<DecompileResult> {
+export async function decompileClass(className: string, jar: Jar, options: Options): Promise<DecompileResult> {
     console.log(`Decompiling class: '${className}'`);
 
     const files = Object.keys(jar.entries);

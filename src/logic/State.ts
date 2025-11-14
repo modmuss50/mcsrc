@@ -15,6 +15,10 @@ const DEFAULT_STATE: State = {
 };
 
 const getInitialState = (): State => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_STATE;
+  }
+
   const hash = window.location.hash;
   const path = hash.startsWith('#/') ? hash.slice(2) : (hash.startsWith('#') ? hash.slice(1) : '');
   const segments = path.split('/').filter(s => s.length > 0);

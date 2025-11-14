@@ -10,6 +10,12 @@ export async function openJar(blob: Blob): Promise<Jar> {
     return new JarImpl(zip);
 }
 
+export async function openArrayBufferJar(buffer: ArrayBuffer): Promise<Jar> {
+    const reader = new ArrayBufferReader(buffer);
+    const zip = await read(reader);
+    return new JarImpl(zip);
+}
+
 export async function streamJar(url: string): Promise<Jar> {
     const reader = new HttpStreamReader(url);
     const zip = await read(reader, {
@@ -49,6 +55,27 @@ class BlobReader implements Reader {
 
     async slice(offset: number, size: number): Promise<Blob> {
         return this.blob.slice(offset, offset + size);
+    }
+}
+
+class ArrayBufferReader implements Reader {
+    private buffer: ArrayBuffer;
+
+    constructor(buffer: ArrayBuffer) {
+        this.buffer = buffer;
+    }
+
+    async length(): Promise<number> {
+        return this.buffer.byteLength;
+    }
+
+    async read(offset: number, size: number): Promise<Uint8Array> {
+        return new Uint8Array(this.buffer, offset, size);
+    }
+
+    async slice(offset: number, size: number): Promise<Blob> {
+        const slice = this.buffer.slice(offset, offset + size);
+        return new Blob([slice]);
     }
 }
 

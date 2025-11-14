@@ -4,9 +4,20 @@ import { SettingOutlined } from '@ant-design/icons';
 import { Checkbox } from 'antd';
 import { useObservable } from "../utils/UseObservable";
 import { BooleanSetting, enableTabs, removeImports } from "../logic/Settings";
+import { minecraftJar } from "../logic/MinecraftApi";
+import { refreshIndex } from "../logic/Indexer";
 
 const SettingsModal = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const jar = useObservable(minecraftJar);
+
+    const doIndex = async () => {
+        if (jar) {
+            refreshIndex(jar);
+            setIsModalOpen(false);
+        }
+    };
 
     return (
         <>
@@ -21,6 +32,11 @@ const SettingsModal = () => {
             >
                 <Setting setting={removeImports} title={"Hide imports"} />
                 <Setting setting={enableTabs} title={"Enable Tabs"} />
+                {jar && (
+                    <Button type="default" onClick={doIndex} style={{ marginLeft: '8px' }}>
+                        Re-index Jar
+                    </Button>
+                )}
             </Modal>
         </>
     );
