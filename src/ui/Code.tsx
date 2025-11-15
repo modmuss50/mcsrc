@@ -1,11 +1,13 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { useObservable } from '../utils/UseObservable';
-import { currentResult } from '../logic/Decompiler';
+import { currentResult, isDecompiling } from '../logic/Decompiler';
 import { useEffect, useRef } from 'react';
 import { editor } from "monaco-editor";
 import { isThin } from '../logic/Browser';
 import { classesList } from '../logic/JarFile';
 import { openTab } from '../logic/Tabs';
+import { Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 
 const Code = () => {
     const monaco = useMonaco();
@@ -14,6 +16,7 @@ const Code = () => {
     const classList = useObservable(classesList);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const hideMinimap = useObservable(isThin);
+    const decompiling = useObservable(isDecompiling);
 
     useEffect(() => {
         if (!monaco) return;
@@ -73,18 +76,29 @@ const Code = () => {
     }, [decompileResult]);
 
     return (
-        <Editor
-            height="100vh"
-            defaultLanguage="java"
-            theme="vs-dark"
-            value={decompileResult?.source}
-            options={{
-                readOnly: true,
-                domReadOnly: true,
-                tabSize: 3,
-                minimap: { enabled: !hideMinimap }
+        <Spin
+            indicator={<LoadingOutlined spin />}
+            size={"large"}
+            spinning={!!decompiling}
+            tip="Decompiling..."
+            style={{
+                height: '100%',
+                color: 'white'
             }}
-            onMount={(editor) => { editorRef.current = editor; }} />
+        >
+            <Editor
+                height="100vh"
+                defaultLanguage="java"
+                theme="vs-dark"
+                value={decompileResult?.source}
+                options={{
+                    readOnly: true,
+                    domReadOnly: true,
+                    tabSize: 3,
+                    minimap: { enabled: !hideMinimap }
+                }}
+                onMount={(editor) => { editorRef.current = editor; }} />
+        </Spin>
     );
 };
 
