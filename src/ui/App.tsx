@@ -45,7 +45,7 @@ const LargeApp = () => {
 
     return (
         <Splitter onResize={setSizes}>
-            <Splitter.Panel collapsible defaultSize="200px" min="5%" size={sizes[0]}>
+            <Splitter.Panel collapsible defaultSize="200px" min="5%" size={sizes[0]} style={{ height: '100vh' }}>
                 <SideBar />
             </Splitter.Panel>
             <Splitter.Panel size={sizes[1]}>
@@ -92,7 +92,9 @@ const MobileApp = () => {
                         margin: ".5rem .5rem .5rem 1.5rem"
                     }}
                 />
-                {tabsEnabled && <TabsComponent />}
+                {tabsEnabled &&
+                    <span style={{ overflowX: "auto" }}> <TabsComponent /> </span>
+                }
             </Flex>
             <FilepathHeader />
             <Code />
