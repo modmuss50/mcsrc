@@ -54,3 +54,13 @@ html, body {margin: 0; height: 100%; overflow: hidden}
   color: #aadafa !important;
   cursor: pointer;
 }
+
+/* Highlighted line for line linking */
+.highlighted-line {
+  background-color: rgba(255, 255, 100, 0.05) !important;
+}
+
+.highlighted-line-glyph {
+  background-color: rgba(255, 255, 100, 0.3) !important;
+  width: 4px !important;
+}
