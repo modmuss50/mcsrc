@@ -134,7 +134,6 @@ const Code = () => {
                 editorRef.current.revealLinesInCenterIfOutsideViewport(currentLine, lineEnd);
 
                 // Highlight the line range
-                lineHighlightRef.current?.clear();
                 lineHighlightRef.current = editorRef.current.createDecorationsCollection([{
                     range: new Range(currentLine, 1, lineEnd, 1),
                     options: {
