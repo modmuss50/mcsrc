@@ -134,20 +134,15 @@ const Code = () => {
                 editorRef.current.revealLinesInCenterIfOutsideViewport(currentLine, lineEnd);
 
                 // Highlight the line range
-                const decorations = [];
-                for (let i = Math.min(currentLine, lineEnd); i <= Math.max(currentLine, lineEnd); i++) {
-                    decorations.push({
-                        range: new Range(i, 1, i, 1),
-                        options: {
-                            isWholeLine: true,
-                            className: 'highlighted-line',
-                            glyphMarginClassName: 'highlighted-line-glyph'
-                        }
-                    });
-                }
-
                 lineHighlightRef.current?.clear();
-                lineHighlightRef.current = editorRef.current.createDecorationsCollection(decorations);
+                lineHighlightRef.current = editorRef.current.createDecorationsCollection([{
+                    range: new Range(currentLine, 1, lineEnd, 1),
+                    options: {
+                        isWholeLine: true,
+                        className: 'highlighted-line',
+                        glyphMarginClassName: 'highlighted-line-glyph'
+                    }
+                }]);
             } else {
                 // Default: scroll to top
                 editorRef.current.setScrollPosition({ scrollTop: 0, scrollLeft: 0 });
