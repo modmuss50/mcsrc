@@ -128,27 +128,32 @@ const Code = () => {
             lineHighlightRef.current?.clear();
 
             if (currentLine) {
-                // Scroll to the specified line
-                editorRef.current.revealLineInCenterIfOutsideViewport(currentLine);
+                const lineEnd = currentState?.lineEnd ?? currentLine;
 
-                // Highlight the line
-                lineHighlightRef.current?.clear();
-                lineHighlightRef.current = editorRef.current.createDecorationsCollection([
-                    {
-                        range: new Range(currentLine, 1, currentLine, 1),
+                // Scroll to the specified lines
+                editorRef.current.revealLinesInCenterIfOutsideViewport(currentLine, lineEnd);
+
+                // Highlight the line range
+                const decorations = [];
+                for (let i = Math.min(currentLine, lineEnd); i <= Math.max(currentLine, lineEnd); i++) {
+                    decorations.push({
+                        range: new Range(i, 1, i, 1),
                         options: {
                             isWholeLine: true,
                             className: 'highlighted-line',
                             glyphMarginClassName: 'highlighted-line-glyph'
                         }
-                    }
-                ]);
+                    });
+                }
+
+                lineHighlightRef.current?.clear();
+                lineHighlightRef.current = editorRef.current.createDecorationsCollection(decorations);
             } else {
                 // Default: scroll to top
                 editorRef.current.setScrollPosition({ scrollTop: 0, scrollLeft: 0 });
             }
         }
-    }, [decompileResult, currentState?.line]);
+    }, [decompileResult, currentState?.line, currentState?.lineEnd]);
 
     return (
         <Spin
@@ -184,7 +189,12 @@ const Code = () => {
 
                             const currentState = state.value;
                             if (lineNumber && currentState) {
-                                setSelectedFile(currentState.file, lineNumber);
+                                // Shift-click to select a range
+                                if (e.event.shiftKey && currentState.line) {
+                                    setSelectedFile(currentState.file, currentState.line, lineNumber);
+                                } else {
+                                    setSelectedFile(currentState.file, lineNumber);
+                                }
                             }
                         }
                     });
