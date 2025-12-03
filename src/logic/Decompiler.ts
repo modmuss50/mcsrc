@@ -6,7 +6,6 @@ import {
 import { minecraftJar, type MinecraftJar } from "./MinecraftApi";
 import { decompile, type Options, type TokenCollector } from "./vf";
 import { selectedFile } from "./State";
-import { removeImports } from "./Settings";
 import type { Jar } from "../utils/Jar";
 import type { Token } from "./Tokens";
 
@@ -23,23 +22,18 @@ export const isDecompiling = decompilerCounter.pipe(
     distinctUntilChanged()
 );
 
-const decompilerOptions: Observable<Options> = removeImports.observable.pipe(
-    map(removeImports => (
-        { "remove-imports": removeImports ? "1" : "0" }
-    ))
-);
+const DECOMPILER_OPTIONS: Options = {};
 
 export const currentResult = decompileResultPipeline(minecraftJar);
 export function decompileResultPipeline(jar: Observable<MinecraftJar>): Observable<DecompileResult> {
     return combineLatest([
         selectedFile,
         jar,
-        decompilerOptions
     ]).pipe(
         distinctUntilChanged(),
         tap(() => decompilerCounter.next(decompilerCounter.value + 1)),
         throttleTime(250),
-        switchMap(([className, jar, options]) => from(decompileClass(className, jar.jar, options))),
+        switchMap(([className, jar]) => from(decompileClass(className, jar.jar, DECOMPILER_OPTIONS))),
         tap(() => decompilerCounter.next(decompilerCounter.value - 1)),
         shareReplay({ bufferSize: 1, refCount: false })
     );

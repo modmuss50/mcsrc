@@ -3,7 +3,7 @@ import { useState } from "react";
 import { SettingOutlined } from '@ant-design/icons';
 import { Checkbox } from 'antd';
 import { useObservable } from "../utils/UseObservable";
-import { BooleanSetting, enableTabs, removeImports } from "../logic/Settings";
+import { BooleanSetting, enableTabs } from "../logic/Settings";
 
 const SettingsModal = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,7 +19,6 @@ const SettingsModal = () => {
                 onCancel={() => setIsModalOpen(false)}
                 footer={null}
             >
-                <Setting setting={removeImports} title={"Hide imports"} />
                 <Setting setting={enableTabs} title={"Enable Tabs"} />
             </Modal>
         </>

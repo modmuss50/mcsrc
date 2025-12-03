@@ -2,7 +2,7 @@ import Editor, { useMonaco } from '@monaco-editor/react';
 import { useObservable } from '../utils/UseObservable';
 import { currentResult, isDecompiling } from '../logic/Decompiler';
 import { useEffect, useRef } from 'react';
-import { editor, Range, Uri, type IPosition, type IRange } from "monaco-editor";
+import { editor, languages, Range, Uri, type CancellationToken, type IPosition, type IRange } from "monaco-editor";
 import { isThin } from '../logic/Browser';
 import { classesList } from '../logic/JarFile';
 import { openTab } from '../logic/Tabs';
@@ -88,7 +88,63 @@ const Code = () => {
             }
         });
 
+        const foldingRange = monaco.languages.registerFoldingRangeProvider("java", {
+            provideFoldingRanges: function (model: editor.ITextModel, context: languages.FoldingContext, token: CancellationToken): languages.ProviderResult<languages.FoldingRange[]> {
+                const lines = model.getLinesContent();
+                let packageLine: number | null = null;
+                let firstImportLine: number | null = null;
+                let lastImportLine: number | null = null;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const trimmedLine = lines[i].trim();
+                    if (trimmedLine.startsWith('package ')) {
+                        packageLine = i + 1;
+                    } else if (trimmedLine.startsWith('import ')) {
+                        if (firstImportLine === null) {
+                            firstImportLine = i + 1;
+                        }
+                        lastImportLine = i + 1;
+                    }
+                }
+
+                // Check if there's any non-empty line after the last import
+                // If not its likely a package-info and doesnt need folding.
+                if (lastImportLine !== null) {
+                    let hasContentAfterImports = false;
+                    for (let i = lastImportLine; i < lines.length; i++) {
+                        if (lines[i].trim().length > 0) {
+                            hasContentAfterImports = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasContentAfterImports) {
+                        return [];
+                    }
+                }
+
+                // Include the package line before imports to completely hide them when folded
+                if (packageLine !== null && firstImportLine !== null && lastImportLine !== null) {
+                    return [{
+                        start: packageLine,
+                        end: lastImportLine,
+                        kind: monaco.languages.FoldingRangeKind.Imports
+                    }];
+                } else if (firstImportLine !== null && lastImportLine !== null && firstImportLine < lastImportLine) {
+                    // Fallback if no package line exists
+                    return [{
+                        start: firstImportLine,
+                        end: lastImportLine,
+                        kind: monaco.languages.FoldingRangeKind.Imports
+                    }];
+                }
+
+                return [];
+            }
+        });
+
         return () => {
+            foldingRange.dispose();
             editorOpener.dispose();
             definitionProvider.dispose();
         };
@@ -126,6 +182,9 @@ const Code = () => {
             const currentLine = currentState?.line;
             editorRef.current.setPosition({ lineNumber: currentLine ?? 1, column: 1 });
             lineHighlightRef.current?.clear();
+
+            // Fold imports when content changes `foldingImportsByDefault` has a bug where it only folds once.
+            editorRef.current.getAction('editor.foldAll')?.run();
 
             if (currentLine) {
                 const lineEnd = currentState?.lineEnd ?? currentLine;
@@ -170,10 +229,14 @@ const Code = () => {
                     domReadOnly: true,
                     tabSize: 3,
                     minimap: { enabled: !hideMinimap },
-                    glyphMargin: true
+                    glyphMargin: true,
+                    foldingImportsByDefault: true
                 }}
                 onMount={(codeEditor) => {
                     editorRef.current = codeEditor;
+
+                    // Fold imports by default
+                    codeEditor.getAction('editor.foldAll')?.run();
 
                     // Handle gutter clicks for line linking
                     codeEditor.onMouseDown((e) => {
