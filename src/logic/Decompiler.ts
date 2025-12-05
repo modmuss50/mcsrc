@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
     BehaviorSubject,
-    combineLatest, distinctUntilChanged, from, map, Observable, shareReplay, switchMap, tap, throttleTime
+    combineLatest, distinctUntilChanged, from, map, Observable, of, shareReplay, switchMap, tap, throttleTime
 } from "rxjs";
 import { minecraftJar, type MinecraftJar } from "./MinecraftApi";
 import { decompile, type Options, type TokenCollector } from "./vf";
 import { selectedFile } from "./State";
 import type { Jar } from "../utils/Jar";
 import type { Token } from "./Tokens";
+import { decompilationCache } from "./DecompilationCache";
 
 export interface DecompileResult {
     className: string;
@@ -33,7 +34,14 @@ export function decompileResultPipeline(jar: Observable<MinecraftJar>): Observab
         distinctUntilChanged(),
         tap(() => decompilerCounter.next(decompilerCounter.value + 1)),
         throttleTime(250),
-        switchMap(([className, jar]) => from(decompileClass(className, jar.jar, DECOMPILER_OPTIONS))),
+        switchMap(([className, jar]) => {
+            const cached = decompilationCache.get(jar.version, className);
+            if (cached) return of(cached);
+
+            return from(decompileClass(className, jar.jar, DECOMPILER_OPTIONS)).pipe(
+                tap(result => decompilationCache.put(jar.version, className, result))
+            );
+        }),
         tap(() => decompilerCounter.next(decompilerCounter.value - 1)),
         shareReplay({ bufferSize: 1, refCount: false })
     );
