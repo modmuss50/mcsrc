@@ -36,13 +36,19 @@ export function decompileResultPipeline(jar: Observable<MinecraftJar>): Observab
         tap(() => decompilerCounter.next(decompilerCounter.value + 1)),
         throttleTime(250),
         switchMap(([className, jar]) => {
-            const cached = decompilationCache.get(`${jar.version}:${className}`);
-            if (cached) return of(cached);
+            const key = `${jar.version}:${className}`;
+            const cached = decompilationCache.get(key);
+            if (cached) {
+                // Re-insert at end
+                decompilationCache.delete(key);
+                decompilationCache.set(key, cached);
+                return of(cached);
+            }
 
             return from(decompileClass(className, jar.jar, DECOMPILER_OPTIONS)).pipe(
                 tap(result => {
                     // Store DecompilationResult in in-memory cache
-                    if (decompilationCache.size >= 2) {
+                    if (decompilationCache.size >= 75) {
                         const firstKey = decompilationCache.keys().next().value;
                         if (firstKey) decompilationCache.delete(firstKey);
                     }
