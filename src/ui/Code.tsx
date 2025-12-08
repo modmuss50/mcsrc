@@ -163,34 +163,33 @@ const Code = () => {
                 const fragment = resource.fragment.split(":") as ['method' | 'field', string];
                 if (fragment.length === 2) {
                     const [targetType, target] = fragment;
-                    currentResult.pipe(filter(value => value.className === className), take(1)).subscribe(value => {
+                    const subscription = currentResult.pipe(filter(value => value.className === className), take(1)).subscribe(value => {
+                        subscription.unsubscribe();
                         for (const token of value.tokens) {
-                            if (token.declaration && token.type == targetType) {
-                                if (
-                                    (targetType === "method" && token.descriptor === target) ||
-                                    (targetType === "field" && token.name === target)
-                                ) {
-                                    const sourceUpTo = value.source.slice(0, token.start);
-                                    const lineNumber = sourceUpTo.match(/\n/g)!.length + 1;
-                                    const column = sourceUpTo.length - sourceUpTo.lastIndexOf("\n");
-                                    console.log(token, lineNumber, column);
-                                    let listener: IDisposable;
-                                    const updateSelection = () => {
-                                        if (listener) listener.dispose();
-                                        editor.setSelection(new Range(lineNumber, column, lineNumber, column + token.length));
-                                    }
-                                    if (jumpInSameFile) {
-                                        updateSelection();
-                                        editor.revealLineInCenter(lineNumber, 0);
-                                    } else {
-                                        listener = editor.onDidChangeModelContent(() => {
-                                            // Wait for DOM to settle
-                                            queueMicrotask(updateSelection)
-                                        });
-                                    }
-                                    break;
-                                }
+                            if (!(token.declaration && token.type == targetType)) continue;
+                            if (
+                                !(targetType === "method" && token.descriptor === target) &&
+                                !(targetType === "field" && token.name === target)
+                            ) continue;
+
+                            const sourceUpTo = value.source.slice(0, token.start);
+                            const lineNumber = sourceUpTo.match(/\n/g)!.length + 1;
+                            const column = sourceUpTo.length - sourceUpTo.lastIndexOf("\n");
+                            let listener: IDisposable;
+                            const updateSelection = () => {
+                                if (listener) listener.dispose();
+                                editor.setSelection(new Range(lineNumber, column, lineNumber, column + token.length));
                             }
+                            if (jumpInSameFile) {
+                                updateSelection();
+                                editor.revealLineInCenter(lineNumber, 0);
+                            } else {
+                                listener = editor.onDidChangeModelContent(() => {
+                                    // Wait for DOM to settle
+                                    queueMicrotask(updateSelection)
+                                });
+                            }
+                            break;
                         }
                     });
                 }
@@ -416,7 +415,7 @@ const Code = () => {
                     codeEditor.getAction('editor.foldAll')?.run();
 
                     // Update context key when cursor position changes
-                    // We use this to know when to show the options to copy AW/Mixin strings 
+                    // We use this to know when to show the options to copy AW/Mixin strings
                     const isDefinitionContextKey = codeEditor.createContextKey<boolean>(IS_DEFINITION_CONTEXT_KEY_NAME, false);
                     codeEditor.onDidChangeCursorPosition((e) => {
                         const token = findTokenAtPosition(codeEditor, decompileResultRef.current, classListRef.current);
