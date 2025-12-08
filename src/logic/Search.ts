@@ -4,12 +4,12 @@ import { classesList } from "./JarFile";
 
 export const searchQuery = new BehaviorSubject("");
 
-const deboucnedSearchQuery: Observable<string> = searchQuery.pipe(
+const debouncedSearchQuery: Observable<string> = searchQuery.pipe(
     throttleTime(200),
     distinctUntilChanged()
 );
 
-export const searchResults: Observable<string[]> = combineLatest([classesList, deboucnedSearchQuery]).pipe(
+export const searchResults: Observable<string[]> = combineLatest([classesList, debouncedSearchQuery]).pipe(
     switchMap(([classes, query]) => {
         if (query.length === 0) {
             return [[]];
