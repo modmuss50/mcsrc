@@ -42,7 +42,7 @@ export const TabsComponent = () => {
             borderRight: "2px solid transparent"
         }
 
-        const tabIndex = tabs.indexOf(key);
+        const tabIndex = tabs.findIndex(tab => tab.key === key);
 
         if (tabIndex === placeIndex && mouseMovementDelta.current >= threshold) {
             style.borderLeft = "2px solid white";
@@ -140,7 +140,7 @@ export const TabsComponent = () => {
             })
             .sort((a, b) => a.dist - b.dist)[0];
 
-        const index = (tabs?.indexOf(closest.key) ?? -Infinity) + (closest.before ? 0 : 1);
+        const index = (tabs?.findIndex(tab => tab.key === closest.key) ?? -Infinity) + (closest.before ? 0 : 1);
         if (index < 0) return;
 
         setPlaceIndexSync(index);
@@ -150,7 +150,7 @@ export const TabsComponent = () => {
         document.removeEventListener("mouseup", handleMouseUp);
         document.removeEventListener("mouseover", handleMouseMove)
 
-        const currentIndex = tabs ? tabs.indexOf(draggingKey.current) : -1;
+        const currentIndex = tabs ? tabs.findIndex(tab => tab.key === draggingKey.current) : -1;
         if (
             placeIndexRef.current >= 0 &&
             placeIndexRef.current !== currentIndex
@@ -172,7 +172,7 @@ export const TabsComponent = () => {
             activeKey={activeKey}
             onEdit={onEdit}
             onTabClick={(key) => openTab(key)}
-            items={tabs?.map((key) => ({
+            items={tabs?.map(({key}) => ({
                 key,
                 label: (
                     <div
