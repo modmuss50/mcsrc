@@ -1,6 +1,6 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { useObservable } from '../utils/UseObservable';
-import { currentResult, isDecompiling } from '../logic/Decompiler';
+import { currentResult, type DecompileResult, isDecompiling } from '../logic/Decompiler';
 import { useEffect, useRef } from 'react';
 import {
     type CancellationToken,
@@ -14,7 +14,7 @@ import {
 } from "monaco-editor";
 import { isThin } from '../logic/Browser';
 import { classesList } from '../logic/JarFile';
-import { activeTabKey, openTab } from '../logic/Tabs';
+import { activeTabKey, openTab, openTabs, tabHistory } from '../logic/Tabs';
 import { message, Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { setSelectedFile, state } from '../logic/State';
@@ -66,6 +66,42 @@ function findTokenAtPosition(
 
 async function setClipboard(text: string): Promise<void> {
     await navigator.clipboard.writeText(text);
+}
+
+function jumpToToken(result: DecompileResult, targetType: 'method' | 'field', target: string, editor: editor.ICodeEditor, sameFile = false) {
+    for (const token of result.tokens) {
+        if (!(token.declaration && token.type == targetType)) continue;
+        if (
+            !(targetType === "method" && token.descriptor === target) &&
+            !(targetType === "field" && token.name === target)
+        ) continue;
+
+        const sourceUpTo = result.source.slice(0, token.start);
+        const lineNumber = sourceUpTo.match(/\n/g)!.length + 1;
+        const column = sourceUpTo.length - sourceUpTo.lastIndexOf("\n");
+        let listener: IDisposable;
+        const updateSelection = () => {
+            if (listener) listener.dispose();
+            editor.setSelection(new Range(lineNumber, column, lineNumber, column + token.length));
+        }
+        if (sameFile) {
+            updateSelection();
+            editor.revealLineInCenter(lineNumber, 0);
+        } else {
+            listener = editor.onDidChangeModelContent(() => {
+                // Wait for DOM to settle
+                queueMicrotask(updateSelection)
+            });
+        }
+        break;
+    }
+}
+
+function onEditorChangeTo(className: string, callback: () => void) {
+    const subscription = currentResult.pipe(filter(value => value.className === className), take(1)).subscribe(() => {
+        subscription.unsubscribe();
+        callback();
+    });
 }
 
 const Code = () => {
@@ -163,35 +199,14 @@ const Code = () => {
                 const fragment = resource.fragment.split(":") as ['method' | 'field', string];
                 if (fragment.length === 2) {
                     const [targetType, target] = fragment;
-                    const subscription = currentResult.pipe(filter(value => value.className === className), take(1)).subscribe(value => {
-                        subscription.unsubscribe();
-                        for (const token of value.tokens) {
-                            if (!(token.declaration && token.type == targetType)) continue;
-                            if (
-                                !(targetType === "method" && token.descriptor === target) &&
-                                !(targetType === "field" && token.name === target)
-                            ) continue;
-
-                            const sourceUpTo = value.source.slice(0, token.start);
-                            const lineNumber = sourceUpTo.match(/\n/g)!.length + 1;
-                            const column = sourceUpTo.length - sourceUpTo.lastIndexOf("\n");
-                            let listener: IDisposable;
-                            const updateSelection = () => {
-                                if (listener) listener.dispose();
-                                editor.setSelection(new Range(lineNumber, column, lineNumber, column + token.length));
-                            }
-                            if (jumpInSameFile) {
-                                updateSelection();
-                                editor.revealLineInCenter(lineNumber, 0);
-                            } else {
-                                listener = editor.onDidChangeModelContent(() => {
-                                    // Wait for DOM to settle
-                                    queueMicrotask(updateSelection)
-                                });
-                            }
-                            break;
-                        }
-                    });
+                    if (jumpInSameFile) {
+                        jumpToToken(decompileResult!, targetType, target, editor, true);
+                    } else {
+                        const subscription = currentResult.pipe(filter(value => value.className === className), take(1)).subscribe(value => {
+                            subscription.unsubscribe();
+                            jumpToToken(value, targetType, target, editor);
+                        });
+                    }
                 }
                 openTab(className);
                 return true;
@@ -354,12 +369,22 @@ const Code = () => {
     // Scroll to top when source changes, or to specific line if specified
     useEffect(() => {
         if (editorRef.current) {
+            const currentTab = openTabs.value.find(tab => tab.key === activeTabKey.value);
+            const prevTab = openTabs.value.find(tab => tab.key === tabHistory.value.at(-2));
+            if (prevTab) {
+                prevTab.scroll = editorRef.current.getScrollTop();
+            }
             const currentLine = currentState?.line;
             editorRef.current.setPosition({ lineNumber: currentLine ?? 1, column: 1 });
             lineHighlightRef.current?.clear();
 
-            // Fold imports when content changes `foldingImportsByDefault` has a bug where it only folds once.
-            editorRef.current.getAction('editor.foldAll')?.run();
+            // Default: scroll to top
+            let targetScroll = 0;
+
+            // Fold imports when content changes: `foldingImportsByDefault` has a bug where it only folds once.
+            editorRef.current.getAction('editor.foldAll')?.run().then(() => {
+                editorRef.current!.setScrollTop(targetScroll);
+            })
 
             if (currentLine) {
                 const lineEnd = currentState?.lineEnd ?? currentLine;
@@ -376,9 +401,8 @@ const Code = () => {
                         glyphMarginClassName: 'highlighted-line-glyph'
                     }
                 }]);
-            } else {
-                // Default: scroll to top
-                editorRef.current.setScrollPosition({ scrollTop: 0, scrollLeft: 0 });
+            } else if (currentTab && currentTab.scroll > 0) {
+                targetScroll = currentTab.scroll;
             }
         }
     }, [decompileResult, currentState?.line, currentState?.lineEnd]);
