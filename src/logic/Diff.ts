@@ -3,11 +3,17 @@ import { minecraftJar, minecraftJarPipeline, selectedMinecraftVersion, type Mine
 import { currentResult, decompileResultPipeline, type DecompileResult } from "./Decompiler";
 
 export const diffView = new BehaviorSubject<boolean>(false);
+export const hideUnchangedSizes = new BehaviorSubject<boolean>(false);
+
+export interface EntryInfo {
+    crcs: number[];
+    totalUncompressedSize: number;
+}
 
 export interface DiffSide {
     selectedVersion: BehaviorSubject<string | null>;
     jar: Observable<MinecraftJar>;
-    entries: Observable<Map<string, number[]>>;
+    entries: Observable<Map<string, EntryInfo>>;
     result: Observable<DecompileResult>;
 }
 
@@ -47,10 +53,11 @@ export function getDiffChanges(): Observable<Map<string, ChangeState>> {
     if (!diffChanges) {
         diffChanges = combineLatest([
             getLeftDiff().entries,
-            getRightDiff().entries
+            getRightDiff().entries,
+            hideUnchangedSizes
         ]).pipe(
-            map(([leftEntries, rightEntries]) => {
-                return getChangedEntries(leftEntries, rightEntries);
+            map(([leftEntries, rightEntries, skipUnchangedSize]) => {
+                return getChangedEntries(leftEntries, rightEntries, skipUnchangedSize);
             })
         );
     }
@@ -59,8 +66,8 @@ export function getDiffChanges(): Observable<Map<string, ChangeState>> {
 
 export type ChangeState = "added" | "deleted" | "modified";
 
-async function getEntriesWithCRC(jar: MinecraftJar): Promise<Map<string, number[]>> {
-    const entries = new Map<string, number[]>();
+async function getEntriesWithCRC(jar: MinecraftJar): Promise<Map<string, EntryInfo>> {
+    const entries = new Map<string, EntryInfo>();
 
     for (const [path, file] of Object.entries(jar.jar.entries)) {
         if (!path.endsWith('.class')) {
@@ -74,9 +81,13 @@ async function getEntriesWithCRC(jar: MinecraftJar): Promise<Map<string, number[
 
         const existing = entries.get(className);
         if (existing) {
-            insertSorted(existing, file.crc32);
+            insertSorted(existing.crcs, file.crc32);
+            existing.totalUncompressedSize += file.uncompressedSize;
         } else {
-            entries.set(className, [file.crc32]);
+            entries.set(className, {
+                crcs: [file.crc32],
+                totalUncompressedSize: file.uncompressedSize
+            });
         }
     }
 
@@ -84,8 +95,9 @@ async function getEntriesWithCRC(jar: MinecraftJar): Promise<Map<string, number[
 }
 
 function getChangedEntries(
-    leftEntries: Map<string, number[]>,
-    rightEntries: Map<string, number[]>
+    leftEntries: Map<string, EntryInfo>,
+    rightEntries: Map<string, EntryInfo>,
+    skipUnchangedSize: boolean = false
 ): Map<string, ChangeState> {
     const changes = new Map<string, ChangeState>();
 
@@ -95,14 +107,17 @@ function getChangedEntries(
     ]);
 
     for (const key of allKeys) {
-        const leftCRC = leftEntries.get(key);
-        const rightCRC = rightEntries.get(key);
+        const leftInfo = leftEntries.get(key);
+        const rightInfo = rightEntries.get(key);
 
-        if (leftCRC === undefined) {
+        if (leftInfo === undefined) {
             changes.set(key, "added");
-        } else if (rightCRC === undefined) {
+        } else if (rightInfo === undefined) {
             changes.set(key, "deleted");
-        } else if (!arraysEqual(leftCRC, rightCRC)) {
+        } else if (!arraysEqual(leftInfo.crcs, rightInfo.crcs)) {
+            if (skipUnchangedSize && leftInfo.totalUncompressedSize === rightInfo.totalUncompressedSize) {
+                continue;
+            }
             changes.set(key, "modified");
         }
     }
