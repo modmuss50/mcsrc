@@ -385,42 +385,46 @@ const Code = () => {
 
     // Scroll to top when source changes, or to specific line if specified
     useEffect(() => {
-        if (editorRef.current) {
+        if (editorRef.current && decompileResult) {
+            const editor = editorRef.current;
             const currentTab = openTabs.value.find(tab => tab.key === activeTabKey.value);
             const prevTab = openTabs.value.find(tab => tab.key === tabHistory.value.at(-2));
             if (prevTab) {
-                prevTab.scroll = editorRef.current.getScrollTop();
+                prevTab.scroll = editor.getScrollTop();
             }
-            const currentLine = currentState?.line;
-            editorRef.current.setPosition({ lineNumber: currentLine ?? 1, column: 1 });
+
             lineHighlightRef.current?.clear();
 
-            // Default: scroll to top
-            let targetScroll = 0;
+            const executeScroll = () => {
+                const currentLine = state.value?.line;
+                if (currentLine) {
+                    const lineEnd = state.value?.lineEnd ?? currentLine;
+                    editor.setSelection(new Range(currentLine, 1, currentLine, 1));
+                    editor.revealLinesInCenterIfOutsideViewport(currentLine, lineEnd);
 
-            // Fold imports when content changes: `foldingImportsByDefault` has a bug where it only folds once.
-            editorRef.current.getAction('editor.foldAll')?.run().then(() => {
-                editorRef.current!.setScrollTop(currentLine);
-            })
+                    // Highlight the line range
+                    lineHighlightRef.current = editor.createDecorationsCollection([{
+                        range: new Range(currentLine, 1, lineEnd, 1),
+                        options: {
+                            isWholeLine: true,
+                            className: 'highlighted-line',
+                            glyphMarginClassName: 'highlighted-line-glyph'
+                        }
+                    }]);
+                } else if (currentTab && currentTab.scroll > 0) {
+                    editor.setScrollTop(currentTab.scroll);
+                } else {
+                    editor.setScrollTop(0);
+                }
+            };
 
-            if (currentLine) {
-                const lineEnd = currentState?.lineEnd ?? currentLine;
-
-                // Scroll to the specified lines
-                editorRef.current.revealLinesInCenterIfOutsideViewport(currentLine, lineEnd);
-
-                // Highlight the line range
-                lineHighlightRef.current = editorRef.current.createDecorationsCollection([{
-                    range: new Range(currentLine, 1, lineEnd, 1),
-                    options: {
-                        isWholeLine: true,
-                        className: 'highlighted-line',
-                        glyphMarginClassName: 'highlighted-line-glyph'
-                    }
-                }]);
-            } else if (currentTab && currentTab.scroll > 0) {
-                targetScroll = currentTab.scroll;
-            }
+            // Wait for folding to complete and DOM to settle
+            editor.getAction('editor.foldAll')?.run().then(() => {
+                // Use requestAnimationFrame to ensure Monaco has finished layout
+                requestAnimationFrame(() => {
+                    executeScroll();
+                });
+            });
         }
     }, [decompileResult, currentState?.line, currentState?.lineEnd]);
 
