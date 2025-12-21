@@ -73,8 +73,8 @@ function jumpToToken(result: DecompileResult, targetType: 'method' | 'field' | '
     for (const token of result.tokens) {
         if (!(token.declaration && token.type == targetType)) continue;
         if (
-            !(targetType === "method" && token.descriptor === target) &&
-            !(targetType === "field" && token.name === target) &&
+            !(targetType === "method" && "descriptor" in token && token.descriptor === target) &&
+            !(targetType === "field" && "name" in token && token.name === target) &&
             !(targetType === "class" && token.className === target)
         ) continue;
 
