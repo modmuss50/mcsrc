@@ -21,6 +21,5 @@ export async function refreshIndex(minecraftJar: MinecraftJar): Promise<void> {
         await indexJar(minecraftJar, indexProgress);
     } finally {
         isRunning = false;
-        indexProgress.next(-1);
     }
 }

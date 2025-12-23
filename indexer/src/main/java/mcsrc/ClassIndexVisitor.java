@@ -1,6 +1,7 @@
 package mcsrc;
 
 import org.objectweb.asm.*;
+import org.teavm.jso.JSBody;
 
 // Based on code from Enigma
 public class ClassIndexVisitor extends ClassVisitor {
@@ -132,7 +133,7 @@ public class ClassIndexVisitor extends ClassVisitor {
 		}
 
 		if (type.getSort() == Type.OBJECT) {
-			context.addClassUsage(type.getClassName(), method.usage());
+			addClassUsage(type.getInternalName(), method.usage());
 		}
 	}
 
@@ -145,23 +146,52 @@ public class ClassIndexVisitor extends ClassVisitor {
 		}
 
 		if (type.getSort() == Type.OBJECT) {
-			context.addClassUsage(type.getClassName(), field.usage());
+			addClassUsage(type.getInternalName(), field.usage());
 		}
 	}
 
 	public void indexClassReference(Entry.Method callerEntry, Entry.Class referencedEntry) {
-		context.addClassUsage(referencedEntry.name(), callerEntry.usage());
+		addClassUsage(referencedEntry.name(), callerEntry.usage());
 	}
 
 	public void indexMethodReference(Entry.Method callerEntry, Entry.Method referencedEntry) {
-		context.addMethodUsage(referencedEntry.str(), callerEntry.usage());
+		addMethodUsage(referencedEntry.str(), callerEntry.usage());
 
 		if (referencedEntry.name().equals("<init>")) {
-			context.addClassUsage(referencedEntry.owner(), callerEntry.usage());
+			addClassUsage(referencedEntry.owner(), callerEntry.usage());
 		}
 	}
 
 	public void indexFieldReference(Entry.Method callerEntry, Entry.Field referencedEntry) {
-		context.addFieldUsage(referencedEntry.str(), callerEntry.usage());
+		addFieldUsage(referencedEntry.str(), callerEntry.usage());
+	}
+
+
+	void addClassUsage(String clazz, String usage) {
+		if (!isMinecraft(clazz)) {
+			return;
+		}
+
+		context.addClassUsage(clazz, usage);
+	}
+
+	void addMethodUsage(String method, String usage) {
+		if (!isMinecraft(method)) {
+			return;
+		}
+
+		context.addMethodUsage(method, usage);
+	}
+
+	void addFieldUsage(String field, String usage) {
+		if (!isMinecraft(field)) {
+			return;
+		}
+
+		context.addFieldUsage(field, usage);
+	}
+
+	boolean isMinecraft(String str) {
+		return str.startsWith("net/minecraft") || str.startsWith("com/mojang");
 	}
 }

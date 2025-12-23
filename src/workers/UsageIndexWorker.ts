@@ -1,23 +1,38 @@
 import { load } from "../../indexer/build/generated/teavm/wasm-gc/indexer.wasm-runtime.js";
 import indexerWasm from '../../indexer/build/generated/teavm/wasm-gc/indexer.wasm?url';
+import { UsageIndexDB } from './UsageIndexDB';
 
 export const index = async (data: ArrayBufferLike, version: string): Promise<void> => {
     const teavm = await load(indexerWasm);
     const indexer = teavm.exports as Indexer;
+    const db = new UsageIndexDB(version);
+    await db.open();
+
+    const usageMap = new Map<string, Set<string>>();
+
+    const addUsage = (key: string, value: string) => {
+        if (!usageMap.has(key)) {
+            usageMap.set(key, new Set());
+        }
+        usageMap.get(key)!.add(value);
+    };
 
     const context: Context = {
         addClassUsage: function (clazz: Class, usage: UsageString): void {
-            //console.log(`Class: ${clazz}, Usage: ${usage}`);
+            addUsage(clazz, usage);
         },
         addMethodUsage: function (method: Method, usage: UsageString): void {
-            //console.log(`Method: ${method}, Usage: ${usage}`);
+            addUsage(method, usage);
         },
         addFieldUsage: function (field: Field, usage: UsageString): void {
-            //console.log(`Field: ${field}, Usage: ${usage}`);
+            addUsage(field, usage);
         }
     };
 
     indexer.index(data, context);
+    await db.batchWrite(usageMap);
+
+    db.close();
 };
 
 type Class = string;

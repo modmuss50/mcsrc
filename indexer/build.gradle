@@ -8,8 +8,9 @@ repositories {
 }
 
 dependencies {
-    implementation libs.asm
-    implementation libs.teavm.core
+    api libs.asm
+    api libs.teavm.core
+    testImplementation libs.teavm.jso
 }
 
 java {
