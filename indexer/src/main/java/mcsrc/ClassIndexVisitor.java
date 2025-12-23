@@ -1,16 +1,13 @@
 package mcsrc;
 
 import org.objectweb.asm.*;
-import org.teavm.jso.JSBody;
 
 // Based on code from Enigma
 public class ClassIndexVisitor extends ClassVisitor {
-	private final Context context;
 	private String name;
 
-	public ClassIndexVisitor(int api, Context context) {
+	public ClassIndexVisitor(int api) {
 		super(api);
-        this.context = context;
     }
 
 	@Override
@@ -133,7 +130,7 @@ public class ClassIndexVisitor extends ClassVisitor {
 		}
 
 		if (type.getSort() == Type.OBJECT) {
-			addClassUsage(type.getInternalName(), method.usage());
+			Indexer.addUsage(type.getInternalName(), method.usage());
 		}
 	}
 
@@ -146,52 +143,23 @@ public class ClassIndexVisitor extends ClassVisitor {
 		}
 
 		if (type.getSort() == Type.OBJECT) {
-			addClassUsage(type.getInternalName(), field.usage());
+			Indexer.addUsage(type.getInternalName(), field.usage());
 		}
 	}
 
 	public void indexClassReference(Entry.Method callerEntry, Entry.Class referencedEntry) {
-		addClassUsage(referencedEntry.name(), callerEntry.usage());
+		Indexer.addUsage(referencedEntry.name(), callerEntry.usage());
 	}
 
 	public void indexMethodReference(Entry.Method callerEntry, Entry.Method referencedEntry) {
-		addMethodUsage(referencedEntry.str(), callerEntry.usage());
+		Indexer.addUsage(referencedEntry.str(), callerEntry.usage());
 
 		if (referencedEntry.name().equals("<init>")) {
-			addClassUsage(referencedEntry.owner(), callerEntry.usage());
+			Indexer.addUsage(referencedEntry.owner(), callerEntry.usage());
 		}
 	}
 
 	public void indexFieldReference(Entry.Method callerEntry, Entry.Field referencedEntry) {
-		addFieldUsage(referencedEntry.str(), callerEntry.usage());
-	}
-
-
-	void addClassUsage(String clazz, String usage) {
-		if (!isMinecraft(clazz)) {
-			return;
-		}
-
-		context.addClassUsage(clazz, usage);
-	}
-
-	void addMethodUsage(String method, String usage) {
-		if (!isMinecraft(method)) {
-			return;
-		}
-
-		context.addMethodUsage(method, usage);
-	}
-
-	void addFieldUsage(String field, String usage) {
-		if (!isMinecraft(field)) {
-			return;
-		}
-
-		context.addFieldUsage(field, usage);
-	}
-
-	boolean isMinecraft(String str) {
-		return str.startsWith("net/minecraft") || str.startsWith("com/mojang");
+		Indexer.addUsage(referencedEntry.str(), callerEntry.usage());
 	}
 }

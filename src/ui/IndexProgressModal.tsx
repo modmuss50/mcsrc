@@ -1,7 +1,7 @@
 import { Modal, Progress } from "antd";
 import { useObservable } from "../utils/UseObservable";
-import { indexProgress } from "../logic/UsageIndex";
 import { distinctUntilChanged } from "rxjs";
+import { indexProgress } from "../workers/UsageIndex";
 
 const distinctProgress = indexProgress.pipe(distinctUntilChanged());
 

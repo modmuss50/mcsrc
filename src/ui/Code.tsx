@@ -20,16 +20,18 @@ import { LoadingOutlined } from '@ant-design/icons';
 import { setSelectedFile, state } from '../logic/State';
 import type { Token } from '../logic/Tokens';
 import { filter, take } from "rxjs";
+import { usageQuery } from '../logic/FindUsages';
 
 const IS_DEFINITION_CONTEXT_KEY_NAME = "is_definition";
 
 function findTokenAtPosition(
     editor: editor.ICodeEditor,
     decompileResult: { tokens: Token[]; } | undefined,
-    classList: string[] | undefined
+    classList: string[] | undefined,
+    useClassList = true
 ): Token | null {
     const model = editor.getModel();
-    if (!model || !decompileResult || !classList) {
+    if (!model || !decompileResult || (useClassList && !classList)) {
         return null;
     }
 
@@ -52,7 +54,7 @@ function findTokenAtPosition(
         if (targetOffset >= token.start && targetOffset <= token.start + token.length) {
             const baseClassName = token.className.split('$')[0];
             const className = baseClassName + ".class";
-            if (classList.includes(className)) {
+            if (!useClassList || classList!.includes(className)) {
                 return token;
             }
         }
@@ -85,14 +87,14 @@ function jumpToToken(result: DecompileResult, targetType: 'method' | 'field' | '
         const updateSelection = () => {
             if (listener) listener.dispose();
             editor.setSelection(new Range(lineNumber, column, lineNumber, column + token.length));
-        }
+        };
         if (sameFile) {
             updateSelection();
             editor.revealLineInCenter(lineNumber, 0);
         } else {
             listener = editor.onDidChangeModelContent(() => {
                 // Wait for DOM to settle
-                queueMicrotask(updateSelection)
+                queueMicrotask(updateSelection);
             });
         }
         break;
@@ -167,10 +169,9 @@ const Code = () => {
 
                             return {
                                 uri: "descriptor" in token ?
-                                    Uri.parse(`goto://class/${className}#${token.type}:${
-                                        token.type === "method" ?
-                                            token.descriptor : token.name
-                                    }`) :
+                                    Uri.parse(`goto://class/${className}#${token.type}:${token.type === "method" ?
+                                        token.descriptor : token.name
+                                        }`) :
                                     Uri.parse(`goto://class/${className}`),
                                 range
                             };
@@ -347,8 +348,38 @@ const Code = () => {
             }
         });
 
+        const viewUsages = monaco.editor.addEditorAction({
+            id: 'find_usages',
+            label: 'Find Usages (Beta)',
+            contextMenuGroupId: 'navigation',
+            precondition: IS_DEFINITION_CONTEXT_KEY_NAME, // TODO this does not contain references to none Minecraft classes 
+            run: async function (editor: editor.ICodeEditor, ...args: any[]): Promise<void> {
+                const token = findTokenAtPosition(editor, decompileResultRef.current, classListRef.current);
+                if (!token) {
+                    messageApi.error("Failed to find token for usages.");
+                    return;
+                }
+
+                switch (token.type) {
+                    case "class":
+                        usageQuery.next(token.className);
+                        break;
+                    case "field":
+                        usageQuery.next(`${token.className}:${token.name}:${token.descriptor}`);
+                        break;
+                    case "method":
+                        usageQuery.next(`${token.className}:${token.name}:${token.descriptor}`);
+                        break;
+                    default:
+                        messageApi.error("Token is not a class, field, or method.");
+                        return;
+                }
+            }
+        });
+
         return () => {
             // Dispose in the oppsite order
+            viewUsages.dispose();
             copyMixin.dispose();
             copyAw.dispose();
             foldingRange.dispose();
