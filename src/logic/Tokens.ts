@@ -1,3 +1,5 @@
+import type { DecompileResult } from "./Decompiler";
+
 export type TokenType = 'class' | 'field' | 'method' | 'parameter' | 'local';
 
 interface BaseToken {
@@ -24,3 +26,16 @@ interface NonMethodToken extends BaseToken {
 }
 
 export type Token = MemberToken | NonMethodToken;
+
+export interface TokenLocation {
+    line: number,
+    column: number;
+    length: number;
+}
+
+export function getTokenLocation(result: DecompileResult, token: Token): TokenLocation {
+    const sourceUpTo = result.source.slice(0, token.start);
+    const line = sourceUpTo.match(/\n/g)!.length + 1;
+    const column = sourceUpTo.length - sourceUpTo.lastIndexOf("\n");
+    return { line, column, length: token.length };
+}

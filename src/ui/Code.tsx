@@ -18,10 +18,13 @@ import { activeTabKey, openTab, openTabs, tabHistory } from '../logic/Tabs';
 import { message, Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { setSelectedFile, state } from '../logic/State';
-import type { Token } from '../logic/Tokens';
+import { getTokenLocation, type Token } from '../logic/Tokens';
 import { filter, take } from "rxjs";
 import { getNextJumpToken, nextUsageNavigation, usageQuery } from '../logic/FindUsages';
 import { setupJavaBytecodeLanguage } from '../utils/JavaBytecode';
+import { IS_JAVADOC_EDITOR } from '../site';
+import { applyJavadocCodeExtensions } from '../javadoc/JavadocCodeExtensions';
+import { javadocData } from '../javadoc/Javadoc';
 
 const IS_DEFINITION_CONTEXT_KEY_NAME = "is_definition";
 
@@ -98,26 +101,6 @@ function jumpToToken(result: DecompileResult, targetType: 'method' | 'field' | '
         }
         break;
     }
-}
-
-interface TokenLocation {
-    line: number,
-    column: number;
-    length: number;
-}
-
-function getTokenLocation(result: DecompileResult, token: Token): TokenLocation {
-    const sourceUpTo = result.source.slice(0, token.start);
-    const line = sourceUpTo.match(/\n/g)!.length + 1;
-    const column = sourceUpTo.length - sourceUpTo.lastIndexOf("\n");
-    return { line, column, length: token.length };
-}
-
-function onEditorChangeTo(className: string, callback: () => void) {
-    const subscription = currentResult.pipe(filter(value => value.className === className), take(1)).subscribe(() => {
-        subscription.unsubscribe();
-        callback();
-    });
 }
 
 const Code = () => {
@@ -429,6 +412,21 @@ const Code = () => {
         decorationsCollectionRef.current?.clear();
         decorationsCollectionRef.current = editor.createDecorationsCollection(decorations);
     }, [decompileResult]);
+
+
+    if (IS_JAVADOC_EDITOR) {
+        const javadoc = useObservable(javadocData);
+
+        useEffect(() => {
+            if (!monaco || !editorRef.current || !decompileResult || !javadoc) return;
+
+            const extensions = applyJavadocCodeExtensions(monaco, editorRef.current, decompileResult, javadoc);
+
+            return () => {
+                extensions.dispose();
+            };
+        }, [monaco, editorRef.current, decompileResult, javadoc]);
+    }
 
     // Scroll to top when source changes, or to specific line if specified
     useEffect(() => {
