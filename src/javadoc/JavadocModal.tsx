@@ -1,13 +1,11 @@
 import { Modal } from "antd";
-import Editor from '@monaco-editor/react';
-import { activeJavadocToken, observeJavadocForToken, setTokenJavadoc } from "./Javadoc";
+import { activeJavadocToken } from "./Javadoc";
 import { useObservable } from "../utils/UseObservable";
 import { IS_JAVADOC_EDITOR } from "../site";
 import type { Token } from "../logic/Tokens";
+import JavadocMarkdownEditor from "./JavadocMarkdownEditor";
 
-const JavadocEditor = ({ token }: { token: Token; }) => {
-    const value = useObservable(observeJavadocForToken(token)) || "";
-
+const ModalBody = ({ token }: { token: Token; }) => {
     return (
         <div style={{ width: "100%", boxSizing: "border-box" }}>
             <div style={{
@@ -28,22 +26,7 @@ const JavadocEditor = ({ token }: { token: Token; }) => {
                 ) : null}
             </div>
             <div style={{ height: "440px", width: "100%", boxSizing: "border-box" }}>
-                <Editor
-                    height="100%"
-                    defaultLanguage="markdown"
-                    value={value}
-                    onChange={(newValue) => {
-                        setTokenJavadoc(token, newValue);
-                    }}
-                    theme="vs-dark"
-                    options={{
-                        minimap: { enabled: false },
-                        scrollBeyondLastLine: false,
-                        fontSize: 14,
-                        lineHeight: 21,
-                        wordWrap: "off",
-                    }}
-                />
+                <JavadocMarkdownEditor token={token} />
             </div>
         </div>
     );
@@ -64,7 +47,7 @@ const JavadocModal = () => {
             footer={null}
             width={750}
         >
-            {token && <JavadocEditor token={token} />}
+            {token && <ModalBody token={token} />}
         </Modal>
     );
 };

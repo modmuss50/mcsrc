@@ -13,7 +13,7 @@ interface BaseToken {
     declaration: boolean;
 }
 
-interface MemberToken extends BaseToken {
+export interface MemberToken extends BaseToken {
     type: 'field' | 'method';
     // The member name
     name: string;
