@@ -48,7 +48,7 @@ const UsageGroupItem = ({ group }: UsageGroupItemProps) => {
     return (
         <div style={{ marginBottom: "4px" }}>
             <div
-                onClick={() => openTab(group.className)}
+                onClick={() => openTab(group.className + ".class")}
                 style={{
                     cursor: "pointer",
                     fontSize: "13px",
