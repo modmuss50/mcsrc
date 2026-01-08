@@ -20,7 +20,7 @@ import { message, Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { setSelectedFile, state } from '../logic/State';
 import { getTokenLocation, type Token } from '../logic/Tokens';
-import { filter, take } from "rxjs";
+import { filter, pairwise, startWith, take } from "rxjs";
 import { getNextJumpToken, nextUsageNavigation, usageQuery } from '../logic/FindUsages';
 import { setupJavaBytecodeLanguage } from '../utils/JavaBytecode';
 import { IS_JAVADOC_EDITOR } from '../site';
@@ -487,60 +487,65 @@ const Code = () => {
             }
         });
 
-        const foldingRange = monaco.languages.registerFoldingRangeProvider("java", {
-            provideFoldingRanges: function (model: editor.ITextModel, context: languages.FoldingContext, token: CancellationToken): languages.ProviderResult<languages.FoldingRange[]> {
-                const lines = model.getLinesContent();
-                let packageLine: number | null = null;
-                let firstImportLine: number | null = null;
-                let lastImportLine: number | null = null;
+        // Only provide a folding range if no viewState exists yet
+        let foldingRange: IDisposable | undefined;
+        const tab = openTabs.getValue().find(o => o.key === activeTabKey.getValue());
+        if (tab && tab.viewState === null && tab.model === null) {
+            foldingRange = monaco.languages.registerFoldingRangeProvider("java", {
+                provideFoldingRanges: function (model: editor.ITextModel, context: languages.FoldingContext, token: CancellationToken): languages.ProviderResult<languages.FoldingRange[]> {
+                    const lines = model.getLinesContent();
+                    let packageLine: number | null = null;
+                    let firstImportLine: number | null = null;
+                    let lastImportLine: number | null = null;
 
-                for (let i = 0; i < lines.length; i++) {
-                    const trimmedLine = lines[i].trim();
-                    if (trimmedLine.startsWith('package ')) {
-                        packageLine = i + 1;
-                    } else if (trimmedLine.startsWith('import ')) {
-                        if (firstImportLine === null) {
-                            firstImportLine = i + 1;
-                        }
-                        lastImportLine = i + 1;
-                    }
-                }
-
-                // Check if there's any non-empty line after the last import
-                // If not its likely a package-info and doesnt need folding.
-                if (lastImportLine !== null) {
-                    let hasContentAfterImports = false;
-                    for (let i = lastImportLine; i < lines.length; i++) {
-                        if (lines[i].trim().length > 0) {
-                            hasContentAfterImports = true;
-                            break;
+                    for (let i = 0; i < lines.length; i++) {
+                        const trimmedLine = lines[i].trim();
+                        if (trimmedLine.startsWith('package ')) {
+                            packageLine = i + 1;
+                        } else if (trimmedLine.startsWith('import ')) {
+                            if (firstImportLine === null) {
+                                firstImportLine = i + 1;
+                            }
+                            lastImportLine = i + 1;
                         }
                     }
 
-                    if (!hasContentAfterImports) {
-                        return [];
+                    // Check if there's any non-empty line after the last import
+                    // If not its likely a package-info and doesnt need folding.
+                    if (lastImportLine !== null) {
+                        let hasContentAfterImports = false;
+                        for (let i = lastImportLine; i < lines.length; i++) {
+                            if (lines[i].trim().length > 0) {
+                                hasContentAfterImports = true;
+                                break;
+                            }
+                        }
+
+                        if (!hasContentAfterImports) {
+                            return [];
+                        }
                     }
-                }
 
-                // Include the package line before imports to completely hide them when folded
-                if (packageLine !== null && firstImportLine !== null && lastImportLine !== null) {
-                    return [{
-                        start: packageLine,
-                        end: lastImportLine,
-                        kind: monaco.languages.FoldingRangeKind.Imports
-                    }];
-                } else if (firstImportLine !== null && lastImportLine !== null && firstImportLine < lastImportLine) {
-                    // Fallback if no package line exists
-                    return [{
-                        start: firstImportLine,
-                        end: lastImportLine,
-                        kind: monaco.languages.FoldingRangeKind.Imports
-                    }];
-                }
+                    // Include the package line before imports to completely hide them when folded
+                    if (packageLine !== null && firstImportLine !== null && lastImportLine !== null) {
+                        return [{
+                            start: packageLine,
+                            end: lastImportLine,
+                            kind: monaco.languages.FoldingRangeKind.Imports
+                        }];
+                    } else if (firstImportLine !== null && lastImportLine !== null && firstImportLine < lastImportLine) {
+                        // Fallback if no package line exists
+                        return [{
+                            start: firstImportLine,
+                            end: lastImportLine,
+                            kind: monaco.languages.FoldingRangeKind.Imports
+                        }];
+                    }
 
-                return [];
-            }
-        });
+                    return [];
+                }
+            });
+        }
 
         const copyAw = monaco.editor.addEditorAction({
             id: 'copy_aw',
@@ -660,7 +665,7 @@ const Code = () => {
             viewUsages.dispose();
             copyMixin.dispose();
             copyAw.dispose();
-            foldingRange.dispose();
+            foldingRange?.dispose();
             editorOpener.dispose();
             hoverProvider.dispose();
             definitionProvider.dispose();
@@ -785,6 +790,51 @@ const Code = () => {
         }
     }, [decompileResult, nextUsage]);
 
+    // Subscribe to tab changes and store model & viewstate of previously opened tab
+    useEffect(() => {
+        const sub = activeTabKey.pipe(
+            startWith(activeTabKey.value),
+            pairwise()
+        ).subscribe(([prev, curr]) => {
+            if (prev === curr) return;
+
+            const previousTab = openTabs.getValue().find(o => o.key === prev);
+            if (previousTab) {
+                previousTab.viewState = editorRef.current?.saveViewState() || null;
+                previousTab.model = editorRef.current?.getModel() || null;
+            }
+        });
+
+        return () => sub.unsubscribe();
+    }, []);
+
+
+    // Handles setting the model and viewstate of the editor
+    useEffect(() => {
+        if (!monaco || !decompileResult) return;
+
+        // Get open tab 
+        const tab = openTabs.value.find(o => o.key === activeTabKey.value);
+        if (!tab) return;
+
+        let model;
+        const uri = monaco.Uri.parse(`inmemory://model/${tab.key}`);
+        model = monaco?.editor.getModel(uri);
+
+        // Create model if it doesn't exist
+        if (!model) {
+            model = monaco.editor.createModel(decompileResult.source, "java", uri);
+        }
+        tab.model = model;
+
+        editorRef.current?.setModel(model);
+        if (tab.viewState) {
+            editorRef.current?.restoreViewState(tab.viewState);
+        }
+
+        editorRef.current?.focus();
+    }, [decompileResult, activeTabKey]);
+
     return (
         <Spin
             indicator={<LoadingOutlined spin />}
@@ -802,7 +852,6 @@ const Code = () => {
                 defaultLanguage={"java"}
                 language={decompileResult?.language}
                 theme="vs-dark"
-                value={decompileResult?.source}
                 options={{
                     readOnly: true,
                     domReadOnly: true,
@@ -810,6 +859,7 @@ const Code = () => {
                     minimap: { enabled: !hideMinimap },
                     glyphMargin: true,
                     foldingImportsByDefault: true,
+                    foldingHighlight: false
                 }}
                 onMount={(codeEditor) => {
                     editorRef.current = codeEditor;

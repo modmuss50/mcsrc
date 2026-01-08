@@ -1,14 +1,17 @@
 import { BehaviorSubject } from "rxjs";
 import { setSelectedFile, state } from "./State";
 import { enableTabs } from "./Settings";
+import { editor } from "monaco-editor";
 
 interface Tab {
     key: string;
     scroll: number;
+    viewState: editor.ICodeEditorViewState | null;
+    model: editor.ITextModel | null;
 }
 
 export const activeTabKey = new BehaviorSubject<string>(state.value.file);
-export const openTabs = new BehaviorSubject<Tab[]>([{ key: state.value.file, scroll: 0 }]);
+export const openTabs = new BehaviorSubject<Tab[]>([{ key: state.value.file, scroll: 0, viewState: null, model: null }]);
 export const tabHistory = new BehaviorSubject<string[]>([state.value.file]);
 
 export const openTab = (key: string) => {
@@ -24,7 +27,7 @@ export const openTab = (key: string) => {
     if (!tabs.some(tab => tab.key === key)) {
         const insertIndex = activeIndex >= 0 ? activeIndex + 1 : tabs.length;
         tabs.splice(insertIndex, 0, {
-            key, scroll: 0
+            key, scroll: 0, viewState: null, model: null
         });
         openTabs.next(tabs);
     }
@@ -43,6 +46,18 @@ export const openTab = (key: string) => {
 
 export const closeTab = (key: string) => {
     if (openTabs.value.length <= 1) return;
+
+    const tab = openTabs.value.find(o => o.key === key);
+
+    // dispose monaco resources
+    if (tab?.model && !tab.model.isDisposed()) {
+        tab.model.dispose();
+    }
+
+    if (tab) {
+        tab.model = null;
+        tab.viewState = null;
+    }
 
     tabHistory.next(tabHistory.value.filter(v => v != key));
     const modifiedOpenTabs = openTabs.value.filter(v => v.key != key);
