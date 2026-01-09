@@ -1,35 +1,40 @@
 import { Button, Modal, type CheckboxProps, Form, Tooltip } from "antd";
-import { useState } from "react";
 import { SettingOutlined } from '@ant-design/icons';
 import { Checkbox } from 'antd';
 import { useObservable } from "../utils/UseObservable";
-import { BooleanSetting, enableTabs, displayLambdas, focusSearch, KeybindSetting, type Key, type KeybindValue, bytecode } from "../logic/Settings";
+import { BooleanSetting, enableTabs, displayLambdas, focusSearch, KeybindSetting, type KeybindValue, bytecode } from "../logic/Settings";
 import { capturingKeybind, rawKeydownEvent } from "../logic/Keybinds";
+import { BehaviorSubject } from "rxjs";
+
+export const settingsModalOpen = new BehaviorSubject<boolean>(false);
+
+export const SettingsModalButton = () => {
+    return (
+        <Button type="default" onClick={() => settingsModalOpen.next(true)}>
+            <SettingOutlined />
+        </Button>
+    );
+};
 
 const SettingsModal = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const isModalOpen = useObservable(settingsModalOpen);
     const displayLambdasValue = useObservable(displayLambdas.observable);
     const bytecodeValue = useObservable(bytecode.observable);
 
     return (
-        <>
-            <Button type="default" onClick={() => setIsModalOpen(true)}>
-                <SettingOutlined />
-            </Button>
-            <Modal
-                title="Settings"
-                open={isModalOpen}
-                onCancel={() => setIsModalOpen(false)}
-                footer={null}
-            >
-                <Form layout="horizontal" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
-                    <BooleanToggle setting={enableTabs} title={"Enable Tabs"} />
-                    <BooleanToggle setting={displayLambdas} title={"Lambda Names"} tooltip="Display lambda names as inline comments. Does not support permalinking." disabled={bytecodeValue} />
-                    <BooleanToggle setting={bytecode} title={"Show Bytecode"} tooltip="Show bytecode instructions alongside decompiled source. Does not support permalinking." disabled={displayLambdasValue} />
-                    <KeybindControl setting={focusSearch} title={"Focus Search"} />
-                </Form>
-            </Modal>
-        </>
+        <Modal
+            title="Settings"
+            open={isModalOpen}
+            onCancel={() => settingsModalOpen.next(false)}
+            footer={null}
+        >
+            <Form layout="horizontal" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
+                <BooleanToggle setting={enableTabs} title={"Enable Tabs"} />
+                <BooleanToggle setting={displayLambdas} title={"Lambda Names"} tooltip="Display lambda names as inline comments. Does not support permalinking." disabled={bytecodeValue} />
+                <BooleanToggle setting={bytecode} title={"Show Bytecode"} tooltip="Show bytecode instructions alongside decompiled source. Does not support permalinking." disabled={displayLambdasValue} />
+                <KeybindControl setting={focusSearch} title={"Focus Search"} />
+            </Form>
+        </Modal>
     );
 };
 

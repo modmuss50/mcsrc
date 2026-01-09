@@ -3,43 +3,52 @@ import { useState } from "react";
 import { agreedEula } from "../logic/Settings";
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { useObservable } from "../utils/UseObservable";
+import { BehaviorSubject } from "rxjs";
+
+export const aboutModalOpen = new BehaviorSubject<boolean>(false);
+
+export const AboutModalButton = () => {
+    return (
+        <Button type="default" onClick={() => aboutModalOpen.next(true)}>
+            <InfoCircleOutlined />
+        </Button>
+    );
+};
 
 const AboutModal = () => {
-    const [isModalOpen, setIsModalOpen] = useState(!agreedEula.value);
     const accepted = useObservable(agreedEula.observable);
+    const isModalOpen = useObservable(aboutModalOpen);
 
-    const showModal = () => {
-        setIsModalOpen(true);
-    };
+    // Open modal automatically if EULA not accepted
+    useState(() => {
+        if (!agreedEula.value) {
+            aboutModalOpen.next(true);
+        }
+    });
 
     const handleCancel = () => {
         if (!accepted) {
             return;
         }
 
-        setIsModalOpen(false);
+        aboutModalOpen.next(false);
     };
 
     return (
-        <>
-            <Button type="default" onClick={showModal}>
-                <InfoCircleOutlined />
-            </Button>
-            <Modal
-                title="About mcsrc.dev"
-                closable={accepted}
-                open={isModalOpen}
-                onCancel={handleCancel}
-                footer={null}
-            >
-                <p>NOTE! This website is not redistributing any Minecraft code or compiled bytecode. The minecraft jar is downloaded directly from Mojang's servers to your device when you use this tool. Check your browser's network requests!</p>
-                <p>The <a href="https://github.com/Vineflower/vineflower">Vineflower</a> decompiler is used after being compiled to wasm as part of the <a href="https://www.npmjs.com/package/@run-slicer/vf">@run-slicer/vf</a> project.</p>
+        <Modal
+            title="About mcsrc.dev"
+            closable={accepted}
+            open={isModalOpen}
+            onCancel={handleCancel}
+            footer={null}
+        >
+            <p>NOTE! This website is not redistributing any Minecraft code or compiled bytecode. The minecraft jar is downloaded directly from Mojang's servers to your device when you use this tool. Check your browser's network requests!</p>
+            <p>The <a href="https://github.com/Vineflower/vineflower">Vineflower</a> decompiler is used after being compiled to wasm as part of the <a href="https://www.npmjs.com/package/@run-slicer/vf">@run-slicer/vf</a> project.</p>
 
-                <p><a href="https://github.com/FabricMC/mcsrc">GitHub</a></p>
+            <p><a href="https://github.com/FabricMC/mcsrc">GitHub</a></p>
 
-                <Eula onAccept={() => setIsModalOpen(false)} />
-            </Modal>
-        </>
+            <Eula onAccept={() => aboutModalOpen.next(false)} />
+        </Modal>
     );
 };
 

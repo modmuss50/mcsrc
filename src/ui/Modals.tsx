@@ -3,6 +3,8 @@ import JavadocModal from "../javadoc/JavadocModal";
 import IndexProgressModal from "./IndexProgressModal";
 import InheritanceModal from "./InheritanceModal";
 import ProgressModal from "./ProgressModal";
+import AboutModal from "./AboutModal";
+import SettingsModal from "./SettingsModal";
 
 const Modals = () => {
     return (
@@ -12,6 +14,8 @@ const Modals = () => {
             <JavadocModal />
             <LoginModal />
             <InheritanceModal />
+            <AboutModal />
+            <SettingsModal />
         </>
     );
 };

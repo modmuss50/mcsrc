@@ -1,8 +1,8 @@
 import { Divider, Flex, Select, Space } from "antd";
 import { minecraftVersionIds, selectedMinecraftVersion } from "../logic/MinecraftApi";
 import { useObservable } from "../utils/UseObservable";
-import AboutModal from "./AboutModal";
-import SettingsModal from "./SettingsModal";
+import { AboutModalButton } from "./AboutModal";
+import { SettingsModalButton } from "./SettingsModal";
 import { diffView } from "../logic/Diff";
 
 const Header = () => {
@@ -38,8 +38,8 @@ export const HeaderBody = () => {
                     <Select.Option key={v} value={v}>{v}</Select.Option>
                 ))}
             </Select>
-            <SettingsModal />
-            <AboutModal />
+            <SettingsModalButton />
+            <AboutModalButton />
         </Space>
     );
 };
