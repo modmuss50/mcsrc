@@ -136,6 +136,11 @@ export const closeOtherTabs = (key: string) => {
     const tab = openTabs.value.find(tab => tab.key === key);
     if (!tab) return;
 
+    // Invalidate all tabs except the one being kept
+    openTabs.value.forEach(t => {
+        if (t.key !== key) t.invalidateCachedView();
+    });
+
     openTabs.next([tab]);
     tabHistory.next([key]);
 
