@@ -1,18 +1,73 @@
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, withLatestFrom } from "rxjs";
 import { setSelectedFile, state } from "./State";
-import { enableTabs } from "./Settings";
+import { bytecode, displayLambdas, enableTabs } from "./Settings";
 import { editor } from "monaco-editor";
+import { type DecompileResult } from "./Decompiler";
+import { selectedMinecraftVersion } from "./MinecraftApi";
 
-interface Tab {
-    key: string;
-    scroll: number;
-    viewState: editor.ICodeEditorViewState | null;
-    model: editor.ITextModel | null;
+class Tab {
+    public key: string;
+    public scroll: number = 0;
+
+    public language: DecompileResult["language"];
+    private version: string | null = selectedMinecraftVersion.value;
+    public viewState: editor.ICodeEditorViewState | null = null;
+    public model: editor.ITextModel | null = null;
+
+    constructor(key: string) {
+        this.key = key;
+        this.language = bytecode.value ? "bytecode" : "java";
+    }
+
+    /**
+     * Checks if cache is invalid.
+     * This is the case if the language or the version changed.
+     */
+    isViewValid(): boolean {
+        const lang = bytecode.value ? "bytecode" : "java";
+        if (this.language === lang && this.version === selectedMinecraftVersion.value) return true;
+        return false;
+    }
+
+    invalidateView() {
+        if (this.isViewValid()) return;
+        this.language = bytecode.value ? "bytecode" : "java";
+        this.version = selectedMinecraftVersion.value;
+        this.resetCachedView();
+    }
+
+    cacheView(
+        language: DecompileResult["language"],
+        viewState: editor.ICodeEditorViewState | null,
+        model: editor.ITextModel | null
+    ) {
+        this.language = language;
+        this.viewState = viewState;
+        this.model = model;
+    }
+
+    resetCachedView() {
+        this.viewState = null;
+
+        if (!this.model) return;
+        this.model.dispose();
+        this.model = null;
+    }
+
+    applyViewToEditor(editor: editor.IStandaloneCodeEditor) {
+        if (!this.model) return;
+        editor.setModel(this.model);
+        if (this.viewState) editor.restoreViewState(this.viewState);
+    }
 }
 
 export const activeTabKey = new BehaviorSubject<string>(state.value.file);
-export const openTabs = new BehaviorSubject<Tab[]>([{ key: state.value.file, scroll: 0, viewState: null, model: null }]);
+export const openTabs = new BehaviorSubject<Tab[]>([new Tab(state.value.file)]);
 export const tabHistory = new BehaviorSubject<string[]>([state.value.file]);
+
+export const getOpenTab = (): (Tab | null) => {
+    return openTabs.value.find(o => o.key === activeTabKey.value) || null;
+};
 
 export const openTab = (key: string) => {
     if (!enableTabs.value) {
@@ -26,9 +81,7 @@ export const openTab = (key: string) => {
     // If class is not already open, open it
     if (!tabs.some(tab => tab.key === key)) {
         const insertIndex = activeIndex >= 0 ? activeIndex + 1 : tabs.length;
-        tabs.splice(insertIndex, 0, {
-            key, scroll: 0, viewState: null, model: null
-        });
+        tabs.splice(insertIndex, 0, new Tab(key));
         openTabs.next(tabs);
     }
 
@@ -49,16 +102,7 @@ export const closeTab = (key: string) => {
 
     const tab = openTabs.value.find(o => o.key === key);
 
-    // dispose monaco resources
-    if (tab?.model && !tab.model.isDisposed()) {
-        tab.model.dispose();
-    }
-
-    if (tab) {
-        tab.model = null;
-        tab.viewState = null;
-    }
-
+    tab?.resetCachedView();
     tabHistory.next(tabHistory.value.filter(v => v != key));
     const modifiedOpenTabs = openTabs.value.filter(v => v.key != key);
 

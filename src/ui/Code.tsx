@@ -1,7 +1,7 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { useObservable } from '../utils/UseObservable';
 import { currentResult, type DecompileResult, isDecompiling } from '../logic/Decompiler';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     type CancellationToken,
     editor,
@@ -15,7 +15,7 @@ import {
 } from "monaco-editor";
 import { isThin } from '../logic/Browser';
 import { classesList } from '../logic/JarFile';
-import { activeTabKey, openTab, openTabs, tabHistory } from '../logic/Tabs';
+import { activeTabKey, getOpenTab, openTab, openTabs, tabHistory } from '../logic/Tabs';
 import { message, Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { setSelectedFile, state } from '../logic/State';
@@ -26,6 +26,8 @@ import { setupJavaBytecodeLanguage } from '../utils/JavaBytecode';
 import { IS_JAVADOC_EDITOR } from '../site';
 import { applyJavadocCodeExtensions } from '../javadoc/JavadocCodeExtensions';
 import { selectedInheritanceClassName } from '../logic/Inheritance';
+import { diffView } from '../logic/Diff';
+import { bytecode } from '../logic/Settings';
 
 const IS_DEFINITION_CONTEXT_KEY_NAME = "is_definition";
 
@@ -252,6 +254,29 @@ const Code = () => {
     const classListRef = useRef(classList);
 
     const [messageApi, contextHolder] = message.useMessage();
+
+    function applyTokenDecorations(model: editor.ITextModel) {
+        if (!decompileResult) return;
+
+        // Reapply token decorations for the current tab
+        if (editorRef.current && decompileResult.tokens) {
+            const decorations = decompileResult.tokens.map(token => {
+                const startPos = model.getPositionAt(token.start);
+                const endPos = model.getPositionAt(token.start + token.length);
+                const canGoTo = !token.declaration && classList && classList.includes(token.className + ".class");
+
+                return {
+                    range: new Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+                    options: {
+                        inlineClassName: token.type + '-token-decoration' + (canGoTo ? "-pointer" : "")
+                    }
+                };
+            });
+
+            decorationsCollectionRef.current?.clear();
+            decorationsCollectionRef.current = editorRef.current.createDecorationsCollection(decorations);
+        }
+    }
 
     // Keep refs updated
     useEffect(() => {
@@ -487,10 +512,10 @@ const Code = () => {
             }
         });
 
-        // Only provide a folding range if no viewState exists yet
+        // provide a folding range if no viewState exists or the language changed
         let foldingRange: IDisposable | undefined;
         const tab = openTabs.getValue().find(o => o.key === activeTabKey.getValue());
-        if (tab && tab.viewState === null) {
+        if (tab && (tab.viewState === null || !tab.isViewValid())) {
             foldingRange = monaco.languages.registerFoldingRangeProvider("java", {
                 provideFoldingRanges: function (model: editor.ITextModel, context: languages.FoldingContext, token: CancellationToken): languages.ProviderResult<languages.FoldingRange[]> {
                     const lines = model.getLinesContent();
@@ -672,33 +697,6 @@ const Code = () => {
         };
     }, [monaco, decompileResult, classList]);
 
-    useEffect(() => {
-        if (!editorRef.current || !decompileResult) return;
-
-        const editor = editorRef.current;
-        const model = editor.getModel();
-        if (!model) return;
-
-        const decorations = decompileResult.tokens.map(token => {
-            const startPos = model.getPositionAt(token.start);
-            const endPos = model.getPositionAt(token.start + token.length);
-            const canGoTo = !token.declaration && classList && classList.includes(token.className + ".class");
-
-            return {
-                range: new Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-                options: {
-                    //hoverMessage: { value: `Class: ${token.className}` },
-                    inlineClassName: token.type + '-token-decoration' + (canGoTo ? "-pointer" : "")
-                }
-            };
-        }, [classList]);
-
-        // Clean up previous collection
-        decorationsCollectionRef.current?.clear();
-        decorationsCollectionRef.current = editor.createDecorationsCollection(decorations);
-    }, [decompileResult]);
-
-
     if (IS_JAVADOC_EDITOR) {
         useEffect(() => {
             if (!monaco || !editorRef.current || !decompileResult) return;
@@ -790,6 +788,8 @@ const Code = () => {
         }
     }, [decompileResult, nextUsage]);
 
+    const [resetViewTrigger, setResetViewTrigger] = useState(false);
+
     // Subscribe to tab changes and store model & viewstate of previously opened tab
     useEffect(() => {
         const sub = activeTabKey.pipe(
@@ -799,41 +799,67 @@ const Code = () => {
             if (prev === curr) return;
 
             const previousTab = openTabs.getValue().find(o => o.key === prev);
-            if (previousTab) {
-                previousTab.viewState = editorRef.current?.saveViewState() || null;
-                previousTab.model = editorRef.current?.getModel() || null;
+            const lang = bytecode.value ? "bytecode" : "java";
+            previousTab?.cacheView(
+                lang,
+                editorRef.current?.saveViewState() || null,
+                editorRef.current?.getModel() || null
+            );
+        });
+
+        // Cache if diffview is opened and restore if it is closed;
+        const sub2 = diffView.subscribe((open) => {
+            const openTab = getOpenTab();
+            if (open) {
+                const lang = bytecode.value ? "bytecode" : "java";
+                openTab?.cacheView(
+                    lang,
+                    editorRef.current?.saveViewState() || null,
+                    editorRef.current?.getModel() || null
+                );
+            } else {
+                if (!openTab) return;
+                setSelectedFile(openTab.key);
+
+                setTimeout(() => {
+                    setResetViewTrigger(!resetViewTrigger);
+                }, 100); // sorry for the yank ^-^
             }
         });
 
-        return () => sub.unsubscribe();
+        return () => {
+            sub.unsubscribe();
+            sub2.unsubscribe();
+        };
     }, []);
-
 
     // Handles setting the model and viewstate of the editor
     useEffect(() => {
+        if (diffView.value) return;
+
         if (!monaco || !decompileResult) return;
 
         // Get open tab 
-        const tab = openTabs.value.find(o => o.key === activeTabKey.value);
+        const tab = getOpenTab();
         if (!tab) return;
 
+        const lang = bytecode.value ? "bytecode" : "java";
+
+        if (!tab.isViewValid()) tab.invalidateView();
+
         let model;
-        const uri = monaco.Uri.parse(`inmemory://model/${tab.key}`);
+        const uri = monaco.Uri.parse(`inmemory://model/${tab.key}/${lang}`);
         model = monaco?.editor.getModel(uri);
 
         // Create model if it doesn't exist
-        if (!model) {
-            model = monaco.editor.createModel(decompileResult.source, "java", uri);
-        }
+        if (!model) model = monaco.editor.createModel(decompileResult.source, lang, uri);
         tab.model = model;
 
-        editorRef.current?.setModel(model);
-        if (tab.viewState) {
-            editorRef.current?.restoreViewState(tab.viewState);
-        }
+        if (editorRef.current) tab.applyViewToEditor(editorRef.current);
 
-        editorRef.current?.focus();
-    }, [decompileResult, activeTabKey]);
+        monaco.editor.setModelLanguage(model, bytecode.value ? "bytecode" : "java");
+        applyTokenDecorations(model);
+    }, [decompileResult, resetViewTrigger]);
 
     return (
         <Spin
@@ -859,7 +885,6 @@ const Code = () => {
                     minimap: { enabled: !hideMinimap },
                     glyphMargin: true,
                     foldingImportsByDefault: true,
-                    foldingHighlight: false
                 }}
                 onMount={(codeEditor) => {
                     editorRef.current = codeEditor;
