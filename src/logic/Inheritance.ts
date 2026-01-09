@@ -6,6 +6,7 @@ export class ClassNode {
     readonly name: string;
     parents: ClassNode[] = [];
     children: ClassNode[] = [];
+    accessFlags: number = 0;
 
     constructor(name: string) {
         this.name = name;
@@ -72,7 +73,8 @@ export async function buildInheritanceIndex(minecraftJar: MinecraftJar): Promise
             const data = await entry.bytes();
             const classInfo = parseClassfile(data);
 
-            index.addClass(classInfo.name);
+            const node = index.addClass(classInfo.name);
+            node.accessFlags = classInfo.accessFlags;
 
             if (classInfo.superName) {
                 if (classNames.includes(classInfo.superName + ".class")) {

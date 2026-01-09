@@ -1,6 +1,7 @@
 import { ReactFlow, type Node, type Edge, Background, useReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { type ClassNode, selectedInheritanceClassName } from "../logic/Inheritance";
+import { ClassNode, selectedInheritanceClassName } from "../logic/Inheritance";
+import { isInterface, isAbstract } from "../utils/Classfile";
 import { useMemo, useCallback, useEffect } from "react";
 import dagre from "dagre";
 import { setSelectedFile } from "../logic/State";
@@ -19,17 +20,36 @@ function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; }
         if (visited.has(node.name)) return;
         visited.add(node.name);
 
+        const isSelected = node.name === classNode.name;
+        const nodeIsInterface = isInterface(node.accessFlags);
+        const nodeIsAbstract = isAbstract(node.accessFlags);
+        let background = "#fff";
+        let color = "#000";
+        let borderStyle = "1px solid #1890ff";
+
+        if (isSelected) {
+            background = "#1890ff";
+            color = "#fff";
+        } else if (nodeIsInterface) {
+            background = "#e6f7ff";
+            borderStyle = "2px dashed #1890ff";
+        } else if (nodeIsAbstract) {
+            background = "#fff7e6";
+            borderStyle = "1px dashed #fa8c16";
+        }
+
         nodes.push({
             id: node.name,
             data: { label: getSimpleClassName(node.name) },
             position: { x: 0, y: 0 }, // Will be calculated by dagre
             style: {
-                background: node.name === classNode.name ? "#1890ff" : "#fff",
-                color: node.name === classNode.name ? "#fff" : "#000",
-                border: "1px solid #1890ff",
+                background,
+                color,
+                border: borderStyle,
                 borderRadius: "5px",
                 padding: "10px",
                 cursor: "pointer",
+                fontStyle: nodeIsInterface || nodeIsAbstract ? "italic" : "normal",
             },
         });
 
@@ -49,17 +69,36 @@ function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; }
         if (visited.has(node.name)) return;
         visited.add(node.name);
 
+        const isSelected = node.name === classNode.name;
+        const nodeIsInterface = isInterface(node.accessFlags);
+        const nodeIsAbstract = isAbstract(node.accessFlags);
+        let background = "#fff";
+        let color = "#000";
+        let borderStyle = "1px solid #1890ff";
+
+        if (isSelected) {
+            background = "#1890ff";
+            color = "#fff";
+        } else if (nodeIsInterface) {
+            background = "#e6f7ff";
+            borderStyle = "2px dashed #1890ff";
+        } else if (nodeIsAbstract) {
+            background = "#fff7e6";
+            borderStyle = "1px dashed #fa8c16";
+        }
+
         nodes.push({
             id: node.name,
             data: { label: getSimpleClassName(node.name) },
             position: { x: 0, y: 0 }, // Will be calculated by dagre
             style: {
-                background: node.name === classNode.name ? "#1890ff" : "#fff",
-                color: node.name === classNode.name ? "#fff" : "#000",
-                border: "1px solid #1890ff",
+                background,
+                color,
+                border: borderStyle,
                 borderRadius: "5px",
                 padding: "10px",
                 cursor: "pointer",
+                fontStyle: nodeIsInterface || nodeIsAbstract ? "italic" : "normal",
             },
         });
 

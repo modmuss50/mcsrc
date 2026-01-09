@@ -4,6 +4,15 @@ export interface Classfile {
     name: string;
     superName: string | null;
     interfaces: string[];
+    accessFlags: number;
+}
+
+export function isInterface(accessFlags: number): boolean {
+    return (accessFlags & 0x0200) !== 0;
+}
+
+export function isAbstract(accessFlags: number): boolean {
+    return (accessFlags & 0x0400) !== 0;
 }
 
 type ConstantPoolEntry =
@@ -161,7 +170,8 @@ export function parseClassfile(data: Uint8Array): Classfile {
         return utf8Info.value;
     };
 
-    // Skip access flags
+    // Read access flags
+    const accessFlags = view.getUint16(offset);
     offset += 2;
 
     // Read this_class
@@ -186,5 +196,5 @@ export function parseClassfile(data: Uint8Array): Classfile {
         interfaces.push(getClassName(interfaceIndex));
     }
 
-    return { name, superName, interfaces };
+    return { name, superName, interfaces, accessFlags };
 }
