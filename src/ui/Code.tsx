@@ -348,6 +348,7 @@ const Code = () => {
             id: 'find_usages',
             label: 'Find Usages',
             contextMenuGroupId: 'navigation',
+            contextMenuOrder: 1, // Place before View Inheritance
             precondition: IS_DEFINITION_CONTEXT_KEY_NAME, // TODO this does not contain references to none Minecraft classes 
             run: async function (editor: editor.ICodeEditor, ...args: any[]): Promise<void> {
                 const token = findTokenAtPosition(editor, decompileResultRef.current, classListRef.current);
@@ -377,6 +378,7 @@ const Code = () => {
             id: 'view_inheritance',
             label: 'View Inheritance Hierarchy',
             contextMenuGroupId: 'navigation',
+            contextMenuOrder: 2, // Place after Find Usages
             run: async function (editor: editor.ICodeEditor, ...args: any[]): Promise<void> {
                 if (!decompileResultRef.current) {
                     messageApi.error("No decompile result available for inheritance view.");

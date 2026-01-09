@@ -1,8 +1,9 @@
-import { ReactFlow, type Node, type Edge, Background } from "@xyflow/react";
+import { ReactFlow, type Node, type Edge, Background, useReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { type ClassNode } from "../logic/Inheritance";
-import { useMemo } from "react";
+import { type ClassNode, selectedInheritanceClassName } from "../logic/Inheritance";
+import { useMemo, useCallback, useEffect } from "react";
 import dagre from "dagre";
+import { setSelectedFile } from "../logic/State";
 
 function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; } {
     const nodes: Node[] = [];
@@ -28,6 +29,7 @@ function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; }
                 border: "1px solid #1890ff",
                 borderRadius: "5px",
                 padding: "10px",
+                cursor: "pointer",
             },
         });
 
@@ -57,6 +59,7 @@ function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; }
                 border: "1px solid #1890ff",
                 borderRadius: "5px",
                 padding: "10px",
+                cursor: "pointer",
             },
         });
 
@@ -125,22 +128,56 @@ function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; }
     return { nodes: layoutedNodes, edges };
 }
 
-const Inheritance = ({ data }: { data: ClassNode; }) => {
+const InheritanceGraph = ({ data }: { data: ClassNode; }) => {
     const { nodes, edges } = useMemo(() => {
         if (!data) return { nodes: [], edges: [] };
         return buildGraphData(data);
     }, [data]);
 
+    const { setCenter, getNode } = useReactFlow();
+
+    useEffect(() => {
+        if (!data) return;
+
+        const timer = setTimeout(() => {
+            const selectedNode = getNode(data.name);
+            if (selectedNode) {
+                setCenter(
+                    selectedNode.position.x + 100,
+                    selectedNode.position.y + 25,
+                    { zoom: 1, duration: 300 }
+                );
+            }
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [data, setCenter, getNode]);
+
+    const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+        // Convert internal class name format (e.g., "net/minecraft/ChatFormatting") to file path
+        const filePath = node.id + ".class";
+        setSelectedFile(filePath);
+        selectedInheritanceClassName.next(null);
+    }, []);
+
+    return (
+        <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            fitView
+            proOptions={{ hideAttribution: true }}
+            onNodeClick={onNodeClick}
+        >
+            <Background />
+        </ReactFlow>
+    );
+};
+
+const Inheritance = ({ data }: { data: ClassNode; }) => {
     return (
         <div style={{ height: "80vh", width: "100%" }}>
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                fitView
-                proOptions={{ hideAttribution: true }}
-            >
-                <Background />
-            </ReactFlow>
+            <ReactFlowProvider>
+                <InheritanceGraph data={data} />
+            </ReactFlowProvider>
         </div>
     );
 };
