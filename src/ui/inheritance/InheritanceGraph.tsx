@@ -1,10 +1,10 @@
 import { ReactFlow, type Node, type Edge, Background, useReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ClassNode, selectedInheritanceClassName } from "../logic/Inheritance";
-import { isInterface, isAbstract } from "../utils/Classfile";
+import { ClassNode, selectedInheritanceClassName } from "../../logic/Inheritance";
+import { isInterface, isAbstract } from "../../utils/Classfile";
 import { useMemo, useCallback, useEffect } from "react";
 import dagre from "dagre";
-import { openTab } from "../logic/Tabs";
+import { openTab } from "../../logic/Tabs";
 
 function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; } {
     const nodes: Node[] = [];
@@ -167,7 +167,7 @@ function buildGraphData(classNode: ClassNode): { nodes: Node[]; edges: Edge[]; }
     return { nodes: layoutedNodes, edges };
 }
 
-const InheritanceGraph = ({ data }: { data: ClassNode; }) => {
+const InheritanceGraphInner = ({ data }: { data: ClassNode; }) => {
     const { nodes, edges } = useMemo(() => {
         if (!data) return { nodes: [], edges: [] };
         return buildGraphData(data);
@@ -211,14 +211,14 @@ const InheritanceGraph = ({ data }: { data: ClassNode; }) => {
     );
 };
 
-const Inheritance = ({ data }: { data: ClassNode; }) => {
+const InheritanceGraph = ({ data }: { data: ClassNode; }) => {
     return (
-        <div style={{ height: "80vh", width: "100%" }}>
+        <div style={{ width: "100%", height: "80vh" }}>
             <ReactFlowProvider>
-                <InheritanceGraph data={data} />
+                <InheritanceGraphInner data={data} />
             </ReactFlowProvider>
         </div>
     );
 };
 
-export default Inheritance;
+export default InheritanceGraph;

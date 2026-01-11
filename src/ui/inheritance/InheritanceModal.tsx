@@ -1,9 +1,24 @@
 import { lazy, Suspense } from "react";
-import { Modal, Spin } from "antd";
-import { useObservable } from "../utils/UseObservable";
-import { selectedInheritanceClassName, selectedInheritanceClassNode } from "../logic/Inheritance";
+import { Modal, Spin, Tabs } from "antd";
+import { useObservable } from "../../utils/UseObservable";
+import { ClassNode, selectedInheritanceClassName, selectedInheritanceClassNode } from "../../logic/Inheritance";
 
-const Inheritance = lazy(() => import("./Inheritance"));
+const InheritanceTree = lazy(() => import("./InheritanceTree"));
+const InheritanceGraph = lazy(() => import("./InheritanceGraph"));
+
+const Inheritance = ({ data }: { data: ClassNode; }) => {
+    const items = [{
+        key: "tree",
+        label: "Tree",
+        children: <InheritanceTree data={data} />,
+    }, {
+        key: "graph",
+        label: "Graph",
+        children: <InheritanceGraph data={data} />,
+    }];
+
+    return <Tabs defaultActiveKey="tree" items={items} />;
+};
 
 const InheritanceModal = () => {
     const data = useObservable(selectedInheritanceClassNode);
