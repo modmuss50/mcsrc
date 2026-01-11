@@ -74,9 +74,6 @@ function getPathKeys(filePath: string): Key[] {
 
 const FileList = () => {
     const [expandedKeys, setExpandedKeys] = useState<Key[]>();
-    const onExpand = (newExpandedKeys: Key[]) => {
-        setExpandedKeys(newExpandedKeys);
-    };
 
     const showLine = useObservable(showLines.observable);
     const selectedKeys = useObservable(selectedFileKeys);
@@ -97,7 +94,11 @@ const FileList = () => {
 
     return (
         <Tree.DirectoryTree
+<<<<<<< HEAD
             showLine={showLines.value}
+=======
+            showLine
+>>>>>>> origin/main
             switcherIcon={<CaretDownFilled />}
             selectedKeys={selectedKeys}
             onSelect={onSelect}

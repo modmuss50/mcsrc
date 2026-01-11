@@ -70,7 +70,8 @@ combineLatest([state, supportsPermalinking]).subscribe(([s, supported]) => {
     return;
   }
 
-  document.title = s.file.replace('.class', '');
+  const className = s.file.split('/').pop()?.replace('.class', '') || s.file;
+  document.title = className;
 
   if (!supported) {
     window.location.hash = '';
@@ -108,11 +109,18 @@ export function updateSelectedMinecraftVersion() {
 }
 
 export function setSelectedFile(file: string, line?: number, lineEnd?: number) {
+  const currentState = state.value;
+
+  // If changing to the same file and no line is specified, preserve existing line
+  // This ensures permalinks with line numbers work correctly
+  const isSameFile = file === currentState.file;
+  const shouldPreserveLine = isSameFile && line === undefined && currentState.line !== undefined;
+
   state.next({
     version: 1,
     minecraftVersion: selectedMinecraftVersion.value || "",
     file,
-    line,
-    lineEnd
+    line: shouldPreserveLine ? currentState.line : line,
+    lineEnd: shouldPreserveLine ? currentState.lineEnd : lineEnd
   });
 }
