@@ -13,7 +13,7 @@ type monaco = typeof import("monaco-editor");
 
 const EDIT_JAVADOC_COMMAND_ID = 'editor.action.editJavadoc';
 
-export function applyJavadocCodeExtensions(monaco: monaco, editor: editor.IStandaloneCodeEditor, jar: MinecraftJar): IDisposable {
+export function applyJavadocCodeExtensions(monaco: monaco, editor: editor.IStandaloneCodeEditor): IDisposable {
     const viewZoneIds: string[] = [];
     const javadocDataSub = javadocData.subscribe((javadoc) => {
         editor.changeViewZones(async (accessor) => {
@@ -23,7 +23,7 @@ export function applyJavadocCodeExtensions(monaco: monaco, editor: editor.IStand
 
             const model = editor.getModel();
             if (!model) return;
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
 
             result.tokens
                 .filter(token => token.declaration)
@@ -50,7 +50,7 @@ export function applyJavadocCodeExtensions(monaco: monaco, editor: editor.IStand
 
     const codeLense = monaco.languages.registerCodeLensProvider("java", {
         provideCodeLenses: async function (model: editor.ITextModel, token: CancellationToken): Promise<languages.CodeLensList> {
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
 
             const lenses: languages.CodeLens[] = [];
 

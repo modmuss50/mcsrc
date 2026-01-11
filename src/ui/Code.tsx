@@ -29,7 +29,7 @@ import {
 } from './CodeExtensions';
 import { diffView } from '../logic/Diff';
 import { bytecode, displayLambdas } from '../logic/Settings';
-import { minecraftJar } from '../logic/MinecraftApi';
+import { minecraftJar, selectedMinecraftVersion } from '../logic/MinecraftApi';
 import { findTokenAtEditorPosition } from './CodeUtils';
 import { getTokenLocation } from '../logic/Tokens';
 import { IS_JAVADOC_EDITOR } from '../site';
@@ -39,7 +39,7 @@ import { refreshJavadocDataForClass } from '../javadoc/Javadoc';
 const Code = () => {
     const monaco = useMonaco();
 
-    const jar = useObservable(minecraftJar);
+    const version = useObservable(selectedMinecraftVersion);
     const className = useObservable(selectedFile);
     const classList = useObservable(classesList);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -57,8 +57,7 @@ const Code = () => {
     const [resetViewTrigger, setResetViewTrigger] = useState(false);
 
     async function applyTokenDecorations(model: editor.ITextModel) {
-        if (!jar) return;
-        const result = await getUriDecompilationResult(jar, model.uri);
+        const result = await getUriDecompilationResult(model.uri);
 
         // Reapply token decorations for the current tab
         if (editorRef.current && result.tokens) {
@@ -87,20 +86,19 @@ const Code = () => {
 
     useEffect(() => {
         if (!monaco) return;
-        if (!jar) return;
 
         const definitionProvider = monaco.languages.registerDefinitionProvider(
             "java",
-            createDefinitionProvider(jar, classListRef)
+            createDefinitionProvider(classListRef)
         );
 
         const hoverProvider = monaco.languages.registerHoverProvider(
             "java",
-            createHoverProvider(jar, classListRef)
+            createHoverProvider(classListRef)
         );
 
         const editorOpener = monaco.editor.registerEditorOpener(
-            createEditorOpener(jar)
+            createEditorOpener()
         );
 
         const foldingRange = monaco.languages.registerFoldingRangeProvider(
@@ -109,19 +107,19 @@ const Code = () => {
         );
 
         const copyAw = monaco.editor.addEditorAction(
-            createCopyAwAction(jar, classListRef, messageApi)
+            createCopyAwAction(classListRef, messageApi)
         );
 
         const copyMixin = monaco.editor.addEditorAction(
-            createCopyMixinAction(jar, classListRef, messageApi)
+            createCopyMixinAction(classListRef, messageApi)
         );
 
         const viewUsages = monaco.editor.addEditorAction(
-            createFindUsagesAction(jar, classListRef, messageApi, (value) => usageQuery.next(value))
+            createFindUsagesAction(classListRef, messageApi, (value) => usageQuery.next(value))
         );
 
         const viewInheritance = monaco.editor.addEditorAction(
-            createViewInheritanceAction(jar, messageApi, (value) => selectedInheritanceClassName.next(value))
+            createViewInheritanceAction(messageApi, (value) => selectedInheritanceClassName.next(value))
         );
 
         const bytecode = setupJavaBytecodeLanguage(monaco);
@@ -138,18 +136,18 @@ const Code = () => {
             hoverProvider.dispose();
             definitionProvider.dispose();
         };
-    }, [monaco, jar, classList, resetViewTrigger]);
+    }, [monaco, classList, resetViewTrigger]);
 
     if (IS_JAVADOC_EDITOR) {
         useEffect(() => {
-            if (!monaco || !editorRef.current || !jar) return;
+            if (!monaco || !editorRef.current) return;
 
-            const extensions = applyJavadocCodeExtensions(monaco, editorRef.current, jar);
+            const extensions = applyJavadocCodeExtensions(monaco, editorRef.current);
 
             return () => {
                 extensions.dispose();
             };
-        }, [monaco, editorRef.current, jar, className]);
+        }, [monaco, editorRef.current, className]);
 
         useEffect(() => {
             if (!className) return;
@@ -162,7 +160,7 @@ const Code = () => {
 
     // Scroll to top when source changes, or to specific line if specified
     useEffect(() => {
-        if (editorRef.current && jar) {
+        if (editorRef.current) {
             const editor = editorRef.current;
             const currentTab = openTabs.value.find(tab => tab.key === activeTabKey.value);
             const prevTab = openTabs.value.find(tab => tab.key === tabHistory.value.at(-2));
@@ -200,16 +198,16 @@ const Code = () => {
                 executeScroll();
             });
         }
-    }, [jar, currentState?.line, currentState?.lineEnd]);
+    }, [currentState?.line, currentState?.lineEnd]);
 
     // Scroll to a "Find usages" token
     useEffect(() => {
         (async () => {
-            if (editorRef.current && jar) {
+            if (editorRef.current) {
                 const model = editorRef.current.getModel();
                 if (!model) return;
 
-                const result = await getUriDecompilationResult(jar, model.uri);
+                const result = await getUriDecompilationResult(model.uri);
                 if (result.language !== "java") return;
 
                 const editor = editorRef.current;
@@ -232,7 +230,7 @@ const Code = () => {
                 });
             }
         })();
-    }, [jar, className, nextUsage]);
+    }, [className, nextUsage]);
 
     // Subscribe to tab changes and store model & viewstate of previously opened tab
     useEffect(() => {
@@ -274,12 +272,13 @@ const Code = () => {
             sub.unsubscribe();
             sub2.unsubscribe();
         };
-    }, [jar, className]);
+    }, []);
 
     // Handles setting the model and viewstate of the editor
     useEffect(() => {
         if (diffView.value) return;
-        if (!monaco || !jar) return;
+        if (!monaco) return;
+        if (!version) return;
 
         const tab = getOpenTab();
         if (!tab) return;
@@ -292,12 +291,12 @@ const Code = () => {
         // FIXME: version is in the fragment for now, but is not used apart from model differentiation.
         //        should the URI be used to actually fetch the jar, so we don't have to pass the JAR
         //        around everywhere? probably.
-        const uri = monaco.Uri.from({ scheme: "mcsrc", path: `${className}`, query, fragment: jar.version });
+        const uri = monaco.Uri.from({ scheme: "mcsrc", path: `${className}`, query, fragment: version });
 
         (async () => {
             if (!tab.model || tab.model?.uri?.toString() !== uri.toString()) {
                 // Create new model with the current decompilation source
-                const result = await getUriDecompilationResult(jar, uri);
+                const result = await getUriDecompilationResult(uri);
                 let model = monaco.editor.createModel(result.source, lang, uri);
 
                 tab.invalidateCachedView();
@@ -307,7 +306,7 @@ const Code = () => {
             if (editorRef.current) tab.applyViewToEditor(editorRef.current);
             applyTokenDecorations(tab.model!);
         })();
-    }, [className, jar, resetViewTrigger]);
+    }, [className, version, resetViewTrigger]);
 
     return (
         <Spin
@@ -341,9 +340,9 @@ const Code = () => {
                     const isDefinitionContextKey = codeEditor.createContextKey<boolean>(IS_DEFINITION_CONTEXT_KEY_NAME, false);
                     codeEditor.onDidChangeCursorPosition(async (e) => {
                         const model = codeEditor.getModel();
-                        if (!jar || !model) return;
+                        if (!model) return;
 
-                        const result = await getUriDecompilationResult(jar, model.uri);
+                        const result = await getUriDecompilationResult(model.uri);
                         const token = findTokenAtEditorPosition(result, codeEditor, classListRef.current);
                         const validToken = token != null && (token.type == "class" || token.type == "method" || token.type == "field");
                         isDefinitionContextKey.set(validToken);

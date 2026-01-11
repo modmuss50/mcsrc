@@ -42,7 +42,26 @@ export const selectedMinecraftVersion = new BehaviorSubject<string | null>(null)
 
 export const downloadProgress = new BehaviorSubject<number | undefined>(undefined);
 
-export const minecraftJar = minecraftJarPipeline(selectedMinecraftVersion);
+let cachedMinecraftJar: [string, Promise<MinecraftJar>] | undefined;
+export async function getMinecraftJar(versionId: string): Promise<MinecraftJar | undefined> {
+    const version = getVersionEntryById(versionId)!;
+    if (!cachedMinecraftJar || cachedMinecraftJar[0] !== version.id) {
+        console.log(`Downloading Minecraft JAR ${version.id}`);
+        const jar = downloadMinecraftJar(version, downloadProgress);
+        cachedMinecraftJar = [version.id, jar];
+        return jar;
+    } else {
+        return cachedMinecraftJar[1];
+    }
+}
+
+export const minecraftJar = selectedMinecraftVersion.pipe(
+    filter(id => id !== null),
+    distinctUntilChanged(),
+    tap(() => updateSelectedMinecraftVersion()),
+    switchMap((id) => from(getMinecraftJar(id!).then(jar => jar!)))
+);
+
 export function minecraftJarPipeline(source$: Observable<string | null>): Observable<MinecraftJar> {
     return source$.pipe(
         filter(id => id !== null),

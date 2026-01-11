@@ -10,7 +10,6 @@ async function setClipboard(text: string): Promise<void> {
 }
 
 export function createCopyAwAction(
-    jar: MinecraftJar,
     classListRef: { current: string[] | undefined; },
     messageApi: { error: (msg: string) => void; success: (msg: string) => void; }
 ) {
@@ -22,7 +21,7 @@ export function createCopyAwAction(
         run: async function (editor: editor.ICodeEditor, ...args: any[]): Promise<void> {
             const model = editor.getModel();
             if (!model) return;
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
 
             const token = findTokenAtEditorPosition(result, editor, classListRef.current);
             if (!token) {
@@ -51,7 +50,6 @@ export function createCopyAwAction(
 }
 
 export function createCopyMixinAction(
-    jar: MinecraftJar,
     classListRef: { current: string[] | undefined; },
     messageApi: { error: (msg: string) => void; success: (msg: string) => void; }
 ) {
@@ -63,7 +61,7 @@ export function createCopyMixinAction(
         run: async function (editor: editor.ICodeEditor, ...args: any[]): Promise<void> {
             const model = editor.getModel();
             if (!model) return;
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
 
             const token = findTokenAtEditorPosition(result, editor, classListRef.current);
             if (!token) {
@@ -92,7 +90,6 @@ export function createCopyMixinAction(
 }
 
 export function createFindUsagesAction(
-    jar: MinecraftJar,
     classListRef: { current: string[] | undefined; },
     messageApi: { error: (msg: string) => void; },
     usageQueryNext: (value: string) => void
@@ -106,7 +103,7 @@ export function createFindUsagesAction(
         run: async function (editor: editor.ICodeEditor, ...args: any[]): Promise<void> {
             const model = editor.getModel();
             if (!model) return;
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
 
             const token = findTokenAtEditorPosition(result, editor, classListRef.current);
             if (!token) {
@@ -133,7 +130,6 @@ export function createFindUsagesAction(
 }
 
 export function createViewInheritanceAction(
-    jar: MinecraftJar,
     messageApi: { error: (msg: string) => void; },
     selectedInheritanceClassNameNext: (value: string) => void
 ) {
@@ -145,7 +141,7 @@ export function createViewInheritanceAction(
         run: async function (editor: editor.ICodeEditor, ...args: any[]): Promise<void> {
             const model = editor.getModel();
             if (!model) return;
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
 
             const className = result.className.replace('.class', '');
             console.log(`Viewing inheritance for ${className}`);

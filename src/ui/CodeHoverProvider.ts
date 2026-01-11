@@ -134,13 +134,10 @@ function parseDescriptor(descriptor: string): string {
     }
 }
 
-export function createHoverProvider(
-    jar: MinecraftJar,
-    classListRef: { current: string[] | undefined; }
-) {
+export function createHoverProvider(classListRef: { current: string[] | undefined; }) {
     return {
         async provideHover(model: editor.ITextModel, position: IPosition) {
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
             const token = findTokenAt(result, model.getOffsetAt(position), classListRef.current, false);
 
             // Check for tokens first (classes, methods, fields, etc.)

@@ -5,17 +5,19 @@ import { currentResult, getDecompilationResult } from '../logic/Decompiler';
 import { activeTabKey, openTab } from '../logic/Tabs';
 import { getTokenLocation } from '../logic/Tokens';
 import { filter, take } from "rxjs";
-import type { MinecraftJar } from "../logic/MinecraftApi";
+import { getMinecraftJar } from "../logic/MinecraftApi";
 
-export async function getUriDecompilationResult(jar: MinecraftJar, uri: Uri): Promise<DecompileResult> {
+export async function getUriDecompilationResult(uri: Uri): Promise<DecompileResult> {
     const options = new URLSearchParams(uri.query);
     const option = options.has("bytecode") ? "bytecode" : options.has("lambdas") ? "lambdas" : undefined;
+
+    const jar = await getMinecraftJar(uri.fragment);
+    if (!jar) throw new Error(`couldn't fetch minecraft JAR for version ${uri.fragment}`);
 
     return await getDecompilationResult(jar, uri.path, option);
 }
 
 export async function jumpToToken(
-    jar: MinecraftJar,
     targetType: 'method' | 'field' | 'class',
     target: string,
     editor: editor.ICodeEditor,
@@ -23,7 +25,7 @@ export async function jumpToToken(
 ) {
     const model = editor.getModel();
     if (!model) return;
-    const result = await getUriDecompilationResult(jar, model.uri);
+    const result = await getUriDecompilationResult(model.uri);
 
     for (const token of result.tokens) {
         if (!(token.declaration && token.type == targetType)) continue;
@@ -52,15 +54,12 @@ export async function jumpToToken(
     }
 }
 
-export function createDefinitionProvider(
-    jar: MinecraftJar,
-    classListRef: { current: string[] | undefined; }
-) {
+export function createDefinitionProvider(classListRef: { current: string[] | undefined; }) {
     return {
         async provideDefinition(model: editor.ITextModel, position: IPosition, token: CancellationToken) {
             const { lineNumber, column } = position;
 
-            const result = await getUriDecompilationResult(jar, model.uri);
+            const result = await getUriDecompilationResult(model.uri);
             if (!result) return;
 
             const classList = classListRef.current;
@@ -113,7 +112,7 @@ export function createDefinitionProvider(
     };
 }
 
-export function createEditorOpener(jar: MinecraftJar) {
+export function createEditorOpener() {
     return {
         openCodeEditor: async function (editor: editor.ICodeEditor, resource: Uri, selectionOrPosition?: IRange | IPosition): Promise<boolean> {
             if (!resource.scheme.startsWith("goto")) {
@@ -130,22 +129,22 @@ export function createEditorOpener(jar: MinecraftJar) {
             if (fragment.length === 2) {
                 const [targetType, target] = fragment;
                 if (jumpInSameFile) {
-                    jumpToToken(jar, targetType, target, editor, true);
+                    jumpToToken(targetType, target, editor, true);
                 } else {
                     const subscription = currentResult.pipe(filter(value => value.className === baseClassName), take(1)).subscribe(value => {
                         subscription.unsubscribe();
-                        jumpToToken(jar, targetType, target, editor);
+                        jumpToToken(targetType, target, editor);
                     });
                 }
             } else if (baseClassName != className) {
                 // Handle inner class navigation
                 const innerClassName = className.replace('.class', '');
                 if (jumpInSameFile) {
-                    jumpToToken(jar, 'class', innerClassName, editor, true);
+                    jumpToToken('class', innerClassName, editor, true);
                 } else {
                     const subscription = currentResult.pipe(filter(value => value.className === baseClassName), take(1)).subscribe(value => {
                         subscription.unsubscribe();
-                        jumpToToken(jar, 'class', innerClassName, editor);
+                        jumpToToken('class', innerClassName, editor);
                     });
                 }
             }
