@@ -77,6 +77,13 @@ html, body {margin: 0; height: 100%; overflow: hidden}
   width: 4px !important;
 }
 
-.ant-select-selection-item {
-  width: fit-content !important;
+// Stop icon & text in file tree from wrapping
+.ant-tree-node-content-wrapper {
+    display: flex;
+    flex-wrap: nowrap;
+}
+
+// Stop text in file tree from wrapping
+.ant-tree-title {
+    white-space: nowrap;
 }
