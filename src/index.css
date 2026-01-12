@@ -76,3 +76,7 @@ html, body {margin: 0; height: 100%; overflow: hidden}
   background-color: rgba(255, 255, 100, 0.3) !important;
   width: 4px !important;
 }
+
+.ant-select-selection-item {
+  width: fit-content !important;
+}
