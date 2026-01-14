@@ -1,13 +1,16 @@
-import { Tree } from 'antd';
-import type { TreeDataNode, TreeProps } from 'antd';
+import { Tree, Dropdown, message } from 'antd';
+import type { TreeDataNode, TreeProps, MenuProps } from 'antd';
 import { CaretDownFilled } from '@ant-design/icons';
-import { map, type Observable } from 'rxjs';
+import { firstValueFrom, map, shareReplay, type Observable } from 'rxjs';
 import { classesList } from '../logic/JarFile';
 import { useObservable } from '../utils/UseObservable';
 import { selectedFile } from '../logic/State';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Key } from 'antd/es/table/interface';
 import { openTab } from '../logic/Tabs';
+import { minecraftJar } from '../logic/MinecraftApi';
+import { decompile } from '../logic/vf';
+import { usageQuery } from '../logic/FindUsages';
 
 // Sorts nodes with children first (directories before files), then alphabetically
 const sortTreeNodes = (nodes: TreeDataNode[] = []) => {
@@ -55,7 +58,8 @@ const data: Observable<TreeDataNode[]> = classesList.pipe(
         });
         sortTreeNodes(root);
         return root;
-    })
+    }),
+    shareReplay(1)
 );
 
 const selectedFileKeys = selectedFile.pipe(
@@ -71,16 +75,54 @@ function getPathKeys(filePath: string): Key[] {
     return result;
 }
 
+const handleCopyContent = async (path: string) => {
+    try {
+        const jar = await firstValueFrom(minecraftJar);
+        if (!jar) return;
+
+        if (path.endsWith(".class")) {
+            message.loading({ content: 'Decompiling...', key: 'copy-content' });
+            const classes = await firstValueFrom(classesList);
+            const source = await decompile(path.replace(".class", ""), {
+                source: async (name: string) => {
+                    const file = jar.jar.entries[name + ".class"];
+                    if (file) {
+                        const arrayBuffer = await file.bytes();
+                        return new Uint8Array(arrayBuffer);
+                    }
+                    return null;
+                },
+                resources: classes.map(c => c.replace(".class", ""))
+            });
+            await navigator.clipboard.writeText(source);
+            message.success({ content: 'Content copied to clipboard', key: 'copy-content' });
+        } else {
+            const entry = jar.jar.entries[path];
+            if (entry) {
+                const text = await entry.text();
+                await navigator.clipboard.writeText(text);
+                message.success('Content copied to clipboard');
+            } else {
+                message.error('File not found in jar');
+            }
+        }
+    } catch (e) {
+        console.error(e);
+        message.error({ content: 'Failed to copy content', key: 'copy-content' });
+    }
+};
+
 const FileList = () => {
     const [expandedKeys, setExpandedKeys] = useState<Key[]>();
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, key: string, isLeaf: boolean; } | null>(null);
 
     const selectedKeys = useObservable(selectedFileKeys);
     const classes = useObservable(classesList);
-    const onSelect: TreeProps['onSelect'] = (selectedKeys) => {
+    const onSelect: TreeProps['onSelect'] = useCallback((selectedKeys) => {
         if (selectedKeys.length === 0) return;
         if (!classes || !classes.includes(selectedKeys[0] as string)) return;
         openTab(selectedKeys.join("/"));
-    };
+    }, [classes]);
 
     const treeData = useObservable(data);
 
@@ -88,19 +130,87 @@ const FileList = () => {
         setExpandedKeys(getPathKeys(selectedKeys[0]));
     }
 
+    useEffect(() => {
+        const closeMenu = () => setContextMenu(null);
+        document.addEventListener('click', closeMenu);
+        return () => document.removeEventListener('click', closeMenu);
+    }, []);
+
+    const onRightClick: TreeProps['onRightClick'] = useCallback(({ event, node }) => {
+        setContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            key: node.key as string,
+            isLeaf: !!node.isLeaf
+        });
+    }, []);
+
+    const menuItems: MenuProps['items'] = useMemo(() => contextMenu ? [
+        {
+            key: 'copy-package-path',
+            label: 'Copy Package Path',
+            onClick: () => {
+                const path = contextMenu.key;
+                const formattedPath = path.replace(/\//g, '.').replace('.class', '');
+                navigator.clipboard.writeText(formattedPath);
+                message.success('Path copied');
+            }
+        },
+        {
+            key: 'copy-path',
+            label: 'Copy Path',
+            onClick: () => {
+                navigator.clipboard.writeText(contextMenu.key);
+                message.success('Relative path copied');
+            }
+        },
+        {
+            key: 'copy-content',
+            label: 'Copy File Content',
+            onClick: () => handleCopyContent(contextMenu.key),
+            disabled: !contextMenu.isLeaf
+        },
+        {
+            key: 'find-usages',
+            label: 'Find Usages',
+            onClick: () => {
+                const path = contextMenu.key;
+                if (path.endsWith('.class')) {
+                    const cleanPath = path.replace('.class', '');
+                    usageQuery.next(cleanPath);
+                }
+            },
+            disabled: !contextMenu.isLeaf || !contextMenu.key.endsWith('.class')
+        },
+    ] : [], [contextMenu]);
+
     return (
-        <Tree.DirectoryTree
-            showLine
-            switcherIcon={<CaretDownFilled />}
-            selectedKeys={selectedKeys}
-            onSelect={onSelect}
-            treeData={treeData}
-            expandedKeys={[...expandedKeys || []]}
-            onExpand={setExpandedKeys}
-            titleRender={(nodeData) => (
-                <span style={{ userSelect: "none" }}>{nodeData.title?.toString()}</span>
+        <>
+            <Tree.DirectoryTree
+                showLine
+                switcherIcon={<CaretDownFilled />}
+                selectedKeys={selectedKeys}
+                onSelect={onSelect}
+                treeData={treeData}
+                expandedKeys={[...expandedKeys || []]}
+                onExpand={setExpandedKeys}
+                onRightClick={onRightClick}
+                titleRender={(nodeData) => (
+                    <span style={{ userSelect: "none" }}>{nodeData.title?.toString()}</span>
+                )}
+            />
+            {contextMenu && (
+                <div key={contextMenu.key + contextMenu.x + contextMenu.y} style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000 }}>
+                    <Dropdown
+                        menu={{ items: menuItems }}
+                        open={true}
+                        trigger={['click']}
+                    >
+                        <span />
+                    </Dropdown>
+                </div>
             )}
-        />
+        </>
     );
 };
 
